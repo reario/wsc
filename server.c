@@ -93,7 +93,15 @@ int main(void) {
   uint16_t tab_reg[15]; // max 15 reg. in realtà ne servono 12
 
   mb = modbus_new_tcp("127.0.0.1", 502);
-  modbus_connect(mb);
+
+  if (modbus_connect(mb) == -1) {
+    fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
+    modbus_free(mb);
+    return -1;
+  }
+
+
+
 
   // server url will be http://localhost:9999
   int port = 81;

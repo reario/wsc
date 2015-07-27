@@ -96,18 +96,6 @@ int main(void) {
   mb = modbus_new_tcp("127.0.0.1", 502);
   modbus_connect(mb);
 
-
-
-
-
-
-
-
-
-
-
-
-
   // server url will be http://localhost:9999
   int port = 81;
   int n = 0;
@@ -154,14 +142,17 @@ int main(void) {
       /* Read 12 registers from the address 65 */
       
 
-      modbus_read_registers(mb, 65, 12, tab_reg);
+      if (modbus_read_registers(mb, 65, 12, tab_reg) > 0) { 
       //      printf("V=%f\n%d - %d [%d]\n", V,tab_reg[5]<<16,tab_reg[6],(tab_reg[5]<<16)+tab_reg[6]  );
-      V=(float)(tab_reg[6]+(tab_reg[5]<<16))/1000;
-      I=(float)(tab_reg[4]+(tab_reg[3]<<16))/1000;
-      P=(float)(tab_reg[8]+(tab_reg[7]<<16))/100;
-      Bar=(float)(tab_reg[10]*0.002442);;
-      Bar_pozzo=(float)(tab_reg[11]*0.002442);
-      libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_ENERGY]);
+	V=(float)(tab_reg[6]+(tab_reg[5]<<16))/1000;
+	I=(float)(tab_reg[4]+(tab_reg[3]<<16))/1000;
+	P=(float)(tab_reg[8]+(tab_reg[7]<<16))/100;
+	Bar=(float)(tab_reg[10]*0.002442);;
+	Bar_pozzo=(float)(tab_reg[11]*0.002442);
+	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_ENERGY]);
+      } else {
+	printf("ERR: modbus read registers..\n");
+      }
       oldms = ms;
     }
     n = libwebsocket_service(context, 50);

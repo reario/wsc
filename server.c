@@ -41,11 +41,10 @@ static int callback_energy(struct libwebsocket_context * this,
     //{"Energia":{ "V":217.9,"I":3.0,"P":510},"Bar":3.07,"Bar_pozzo":2.97}
 
     n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\"Bar\":%2.2f,\"Bar_pozzo\":%2.2f}",V,I,P,Bar,Bar_pozzo);
-
     //    n = sprintf((char *)p, "{Energia:{V:%3.1f,I:%2.1f,P:%4.0f},Bar:%2.2f,Bar_pozzo=%2.2f}", V,I,P,Bar,Bar_pozzo);
     m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
     if (m < n) {
-      lwsl_err("ERROR %d writing to di socket\n", n);
+      lwsl_err("ERROR %d writing to di socket (returned %d)\n", n,m);
       return -1;
     }
     break;

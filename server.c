@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <libwebsockets.h>
 #include <math.h>
 #include <modbus.h>
-
 
 static int callback_http(struct libwebsocket_context * this,
                          struct libwebsocket *wsi,
@@ -14,7 +14,25 @@ static int callback_http(struct libwebsocket_context * this,
 }
 
 /* holds random int between 0 and 19 */
-static volatile float V,I,P,Bar,Bar_pozzo;;
+static volatile float V,I,P,Bar,Bar_pozzo;
+static volatile uint16_t io1,io2;
+
+
+uint16_t read_single_state(uint16_t reg, uint16_t q) {
+  /*legge q-esomo bit di reg*/
+  if (q<16) {
+    uint16_t i;
+    i=(1<<q); /* 2^q */
+    if (reg & i) {return 1;} else {return 0;};
+  } else { 
+    return -1; 
+  }
+}
+
+uint16_t invert_state(uint16_t reg, uint16_t q) {
+  /*inverte il q-esimo bit*/
+  return reg^(1<<q);
+}
 
 static int callback_energy(struct libwebsocket_context * this,
 			   struct libwebsocket *wsi,
@@ -36,11 +54,20 @@ static int callback_energy(struct libwebsocket_context * this,
     break;
     
   case LWS_CALLBACK_SERVER_WRITEABLE:
-    //n = sprintf((char *)p, "%3.1f", V);
-    // n = sprintf(payload, "{Energia:{V:%f,I:%f,P:%f},IO:%ui,Bar:%f,Bar_pozzo:%f}", V,I,P,IO,Bar,Bar_pozzo);
-    //{"Energia":{ "V":217.9,"I":3.0,"P":510},"Bar":3.07,"Bar_pozzo":2.97}
+    n = sprintf((char *)p,
+		"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
+\"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,		\
+\"Stati\":{\"Aut\":%d,\"Pozzo\":%d,\"Riemp\":%d,\"LE\":%d,\"LG_4\":%d,\"LG_2\":%d,\"Tav1\":%d,\"Tav2\":%d}}",
+		V,I,P,Bar,Bar_pozzo,io1,io2,
+		read_single_state((uint16_t)io1,(uint16_t)0), // autoclave
+		read_single_state((uint16_t)io1,(uint16_t)1), // Pompa pozzo
+		read_single_state((uint16_t)io1,(uint16_t)2), // Riempimento serbatorio
+		read_single_state((uint16_t)io1,(uint16_t)3), // luci esterne
+		read_single_state((uint16_t)io1,(uint16_t)5), // luci garage da 4
+		read_single_state((uint16_t)io1,(uint16_t)6), // luci garage da 2
+		read_single_state((uint16_t)io1,(uint16_t)7), // taverna1
+		read_single_state((uint16_t)io1,(uint16_t)8));// taverna2
 
-    n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\"Bar\":%2.2f,\"Bar_pozzo\":%2.2f}",V,I,P,Bar,Bar_pozzo);
     //    n = sprintf((char *)p, "{Energia:{V:%3.1f,I:%2.1f,P:%4.0f},Bar:%2.2f,Bar_pozzo=%2.2f}", V,I,P,Bar,Bar_pozzo);
     m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
     if (m < n) {
@@ -49,7 +76,7 @@ static int callback_energy(struct libwebsocket_context * this,
     }
     break;
     
-  case LWS_CALLBACK_RECEIVE:  // the funny part
+  case LWS_CALLBACK_RECEIVE: 
     fprintf(stderr, "rx %d\n", (int)len);
     break;
     
@@ -99,9 +126,6 @@ int main(void) {
     modbus_free(mb);
     return -1;
   }
-
-
-
 
   // server url will be http://localhost:9999
   int port = 81;
@@ -156,12 +180,27 @@ int main(void) {
 	P=(float)(tab_reg[8]+(tab_reg[7]<<16))/100;
 	Bar=(float)(tab_reg[10]*0.002442);;
 	Bar_pozzo=(float)(tab_reg[11]*0.002442);
+	io1=tab_reg[0];
+	io2=tab_reg[1];
+
+
+
+
 	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_ENERGY]);
       } else {
-	printf("ERR: modbus read registers..\n");
-      }
+	printf("ERR: modbus read registers..riprovo a creare il context\n");
+	modbus_close(mb);
+	modbus_free(mb);
+	mb = modbus_new_tcp("127.0.0.1", 502);
+	if (modbus_connect(mb) == -1) {
+	  fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
+	  modbus_free(mb);
+	  return -1;
+	}
+
+      } // else
       oldms = ms;
-    }
+    } // (ms - oldms) > 50) 
     n = libwebsocket_service(context, 50);
   }
   

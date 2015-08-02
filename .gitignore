@@ -19,6 +19,7 @@ libwebsockets-1.4-chrome43-firefox-36/*
 *.out
 *.app
 server
+bit
 
 # emacs
 *~

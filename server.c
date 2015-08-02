@@ -17,6 +17,19 @@ static int callback_http(struct libwebsocket_context * this,
 static volatile float V,I,P,Bar,Bar_pozzo;
 static volatile uint16_t io1,io2;
 
+void printbitssimple(uint16_t n) {
+  /*dato l'intero n stampa la rappresentazione binaria*/
+  unsigned int i;
+  i = 1<<(sizeof(n) * 8 - 1); /* 2^n */
+  while (i > 0) {
+    if (n & i)
+      printf("1");
+    else
+      printf("0");
+    i >>= 1;
+  }
+}
+
 
 uint16_t read_single_state(uint16_t reg, uint16_t q) {
   /*legge q-esomo bit di reg*/
@@ -56,17 +69,30 @@ static int callback_energy(struct libwebsocket_context * this,
   case LWS_CALLBACK_SERVER_WRITEABLE:
     n = sprintf((char *)p,
 		"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
-\"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,		\
-\"Stati\":{\"Aut\":%d,\"Pozzo\":%d,\"Riemp\":%d,\"LE\":%d,\"LG_4\":%d,\"LG_2\":%d,\"Tav1\":%d,\"Tav2\":%d}}",
+\"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,\
+\"Stati\":{\"Aut\":%d,\"Pozzo\":%d,\"Riemp\":%d,\"LE\":%d,\"R8\":%d,\"LG_4\":%d,\"LG_2\":%d,\"Tav1\":%d,\"Tav2\":%d,\"INT\":%d,\"C9912\":%d,\
+\"culu\":%d,\"cuco\":%d,\"lust\":%d,\"luansc\":%d,\"genaut\":%d,\"lucant\":%d}}",
 		V,I,P,Bar,Bar_pozzo,io1,io2,
 		read_single_state((uint16_t)io1,(uint16_t)0), // autoclave
 		read_single_state((uint16_t)io1,(uint16_t)1), // Pompa pozzo
 		read_single_state((uint16_t)io1,(uint16_t)2), // Riempimento serbatorio
 		read_single_state((uint16_t)io1,(uint16_t)3), // luci esterne
+		read_single_state((uint16_t)io1,(uint16_t)4), // R8 centralino
 		read_single_state((uint16_t)io1,(uint16_t)5), // luci garage da 4
 		read_single_state((uint16_t)io1,(uint16_t)6), // luci garage da 2
 		read_single_state((uint16_t)io1,(uint16_t)7), // taverna1
-		read_single_state((uint16_t)io1,(uint16_t)8));// taverna2
+		read_single_state((uint16_t)io1,(uint16_t)8), // taverna2
+		read_single_state((uint16_t)io1,(uint16_t)9), // internet
+		read_single_state((uint16_t)io1,(uint16_t)10), // Centralino 9912 (luci esterne da centralino)
+		read_single_state((uint16_t)io1,(uint16_t)11), // Cunicolo lungo
+ 		read_single_state((uint16_t)io1,(uint16_t)12), // Cunicolo corto
+		read_single_state((uint16_t)io1,(uint16_t)13), // luci studio sotto
+		read_single_state((uint16_t)io1,(uint16_t)14), // luci androne scale
+		read_single_state((uint16_t)io1,(uint16_t)15), // generale autoclave
+		read_single_state((uint16_t)io2,(uint16_t)0) // luce cantinetta
+    );
+
+    //    printbitssimple((uint16_t)io2);
 
     //    n = sprintf((char *)p, "{Energia:{V:%3.1f,I:%2.1f,P:%4.0f},Bar:%2.2f,Bar_pozzo=%2.2f}", V,I,P,Bar,Bar_pozzo);
     m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);

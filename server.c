@@ -67,11 +67,30 @@ static int callback_energy(struct libwebsocket_context * this,
     break;
     
   case LWS_CALLBACK_SERVER_WRITEABLE:
-    n = sprintf((char *)p,
-		"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
+    /* INPUT */
+    /* INGRESSI: NOME bit della word %MW65 del PLC
+       AUTOCLAVE 0
+       POMPA_SOMMERSA 1
+       RIEMPIMENTO 2
+       LUCI_ESTERNE_SOTTO 3
+       CENTR_R8 4
+       LUCI_GARAGE_DA_4 5
+       LUCI_GARAGE_DA_2 6
+       LUCI_TAVERNA_1_di_2 7
+       LUCI_TAVERNA_2_di_2 8
+       INTERNET 9
+       C9912 10
+       LUCI_CUN_LUN 11
+       LUCI_CUN_COR 12
+       LUCI_STUDIO_SOTTO 13
+       LUCI_ANDRONE_SCALE 14
+       GENERALE_AUTOCLAVE 15
+       LUCI_CANTINETTA 16
+    */
+    n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
 \"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,\
-\"Stati\":{\"Aut\":%d,\"Pozzo\":%d,\"Riemp\":%d,\"LE\":%d,\"R8\":%d,\"LG_4\":%d,\"LG_2\":%d,\"Tav1\":%d,\"Tav2\":%d,\"INT\":%d,\"C9912\":%d,\
-\"culu\":%d,\"cuco\":%d,\"lust\":%d,\"luansc\":%d,\"genaut\":%d,\"lucant\":%d}}",
+\"Stati\":{\"AUTOCLAVE\":%d,\"POMPA_SOMMERSA\":%d,\"RIEMPIMENTO\":%d,\"LUCI_ESTERNE_SOTTO\":%d,\"CENTR_R8\":%d,\"LUCI_GARAGE_DA_4\":%d,\"LUCI_GARAGE_DA_2\":%d,\"LUCI_TAVERNA_1_di_2\":%d,\"LUCI_TAVERNA_2_di_2\":%d,\"INTERNET\":%d,\"C9912\":%d,\
+\"LUCI_CUN_LUN\":%d,\"LUCI_CUN_COR\":%d,\"LUCI_STUDIO_SOTTO\":%d,\"LUCI_ANDRONE_SCALE\":%d,\"GENERALE_AUTOCLAVE\":%d,\"LUCI_CANTINETTA\":%d}}",
 		V,I,P,Bar,Bar_pozzo,io1,io2,
 		read_single_state((uint16_t)io1,(uint16_t)0), // autoclave
 		read_single_state((uint16_t)io1,(uint16_t)1), // Pompa pozzo

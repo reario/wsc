@@ -122,7 +122,7 @@ static int callback_energy(struct libwebsocket_context * this,
     break;
     
   case LWS_CALLBACK_RECEIVE: 
-    fprintf(stderr, "rx %d\n", (int)len);
+    fprintf(stderr, "rx %s\n", (char *)in);
     break;
     
     default:

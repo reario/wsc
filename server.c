@@ -5,6 +5,23 @@
 #include <math.h>
 #include <modbus.h>
 
+/* BOBINE DEI PULSANTI COMANDABILI DA ESTERNO: MAGELIS, INTERFACCIA A CARATTERI */
+#define LUCI_ESTERNE_SOTTO 2 /* %M2 */
+#define LUCI_CUN_LUN 3 /* %M3 */
+#define LUCI_CUN_COR 4 /* %M4 */
+#define LUCI_TAVERNA 5 /* %M5 */
+#define LUCI_GARAGE 6 /* %M6 */
+#define LUCI_STUDIO_SOTTO 7 /* %M7 */
+#define LUCI_ANDRONE_SCALE 8 /* %M8 */
+#define LUCI_CANTINETTA 10 /* %M10 */
+#define SERRATURA_PORTONE 12 /* %M12 */
+#define APERTURA_PARZIALE 96 /* %M96 */
+#define APERTURA_TOTALE 97 /* %M97 */
+/* Cicalini */
+#define CICALINO_AUTOCLAVE 60 /* %M60 */
+#define CICALINO_POMPA_POZZO 61 /* %M61 */
+/*========================================*/
+
 static int callback_http(struct libwebsocket_context * this,
                          struct libwebsocket *wsi,
                          enum libwebsocket_callback_reasons reason, void *user,
@@ -47,6 +64,23 @@ uint16_t invert_state(uint16_t reg, uint16_t q) {
   return reg^(1<<q);
 }
 
+int pulsante(modbus_t *m,int bobina) {
+
+  if ( modbus_write_bit(m,bobina,TRUE) != 1 ) {
+    printf("ERRORE DI SCRITTURA:PULSANTE ON");
+    return -1;
+  }
+
+  sleep(1);
+  
+  if ( modbus_write_bit(m,bobina,FALSE) != 1 ) {
+    printf("ERRORE DI SCRITTURA:PULSANTE OFF");
+    return -1;
+  }
+  return 0;
+}
+
+
 static int callback_energy(struct libwebsocket_context * this,
 			   struct libwebsocket *wsi,
 			   enum libwebsocket_callback_reasons reason,
@@ -56,6 +90,7 @@ static int callback_energy(struct libwebsocket_context * this,
 
 {
   int n,m;
+  modbus_t *mbw;
 
   unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+1024+LWS_SEND_BUFFER_POST_PADDING];
   unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
@@ -122,7 +157,17 @@ static int callback_energy(struct libwebsocket_context * this,
     break;
     
   case LWS_CALLBACK_RECEIVE: 
+
+    mbw = modbus_new_tcp("192.168.1.157", 502);
+    if (modbus_connect(mbw) == -1) {
+      fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
+      modbus_free(mbw);
+      return -1;
+    }
+    pulsante(mbw,LUCI_CANTINETTA);
     fprintf(stderr, "rx %s\n", (char *)in);
+    modbus_close(mbw);
+    modbus_free(mbw);    
     break;
     
     default:
@@ -205,7 +250,6 @@ int main(void) {
   // infinite loop, to end this server send SIGTERM. (CTRL+C)
   while (n >= 0) {
     struct timeval tv;
-    /* random int between 0 and 19 */
     gettimeofday(&tv, NULL);
     
     /*
@@ -219,7 +263,6 @@ int main(void) {
       
 
       if (modbus_read_registers(mb, 65, 12, tab_reg) > 0) { 
-      //      printf("V=%f\n%d - %d [%d]\n", V,tab_reg[5]<<16,tab_reg[6],(tab_reg[5]<<16)+tab_reg[6]  );
 	V=(float)(tab_reg[6]+(tab_reg[5]<<16))/1000;
 	I=(float)(tab_reg[4]+(tab_reg[3]<<16))/1000;
 	P=(float)(tab_reg[8]+(tab_reg[7]<<16))/100;
@@ -227,9 +270,6 @@ int main(void) {
 	Bar_pozzo=(float)(tab_reg[11]*0.002442);
 	io1=tab_reg[0];
 	io2=tab_reg[1];
-
-
-
 
 	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_ENERGY]);
       } else {

@@ -105,6 +105,20 @@ static int callback_energy(struct libwebsocket_context * this,
   case LWS_CALLBACK_ESTABLISHED: // just log message that someone is connecting
     printf("connection established\n");
     break;
+
+  case LWS_CALLBACK_RECEIVE: 
+    mbw = modbus_new_tcp("192.168.1.157", 502);
+    if (modbus_connect(mbw) == -1) {
+      fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
+      modbus_free(mbw);
+      return -1;
+    }
+
+    fprintf(stderr, "bobina da accendere: %d\n", atoi((char *)in));
+    pulsante(mbw,atoi((char *)in));
+    modbus_close(mbw);
+    modbus_free(mbw);    
+    break;
     
   case LWS_CALLBACK_SERVER_WRITEABLE:
     /* INPUT */
@@ -160,21 +174,7 @@ static int callback_energy(struct libwebsocket_context * this,
       return -1;
     }
     break;
-    
-  case LWS_CALLBACK_RECEIVE: 
-
-    mbw = modbus_new_tcp("192.168.1.157", 502);
-    if (modbus_connect(mbw) == -1) {
-      fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
-      modbus_free(mbw);
-      return -1;
-    }
-    //    pulsante(mbw,getbobina((char *)in));
-    fprintf(stderr, "rx %s\n", (char *)in);
-    modbus_close(mbw);
-    modbus_free(mbw);    
-    break;
-    
+      
     default:
     break;
   }
@@ -210,6 +210,7 @@ static int callback_spie_bobine(struct libwebsocket_context * this,
       return -1;
     }    
     break;
+
   case LWS_CALLBACK_CLOSED:
     printf("connection *CLOSED* for spie_bobine\n");
     break;

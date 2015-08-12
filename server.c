@@ -1,36 +1,31 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <libwebsockets.h>
 #include <math.h>
 #include <modbus.h>
+#include "server.h"
+ 
+enum bobine {
+  LUCI_ESTERNE_SOTTO = 2, /* %M2 */
+  LUCI_CUN_LUN =3, /* %M3 */
+  LUCI_CUN_COR =4, /* %M4 */
+  LUCI_TAVERNA =5, /* %M5 */
+  LUCI_GARAGE =6, /* %M6 */
+  LUCI_STUDIO_SOTTO =7, /* %M7 */
+  LUCI_ANDRONE_SCALE =8, /* %M8 */
+  LUCI_CANTINETTA =10, /* %M10 */
+  SERRATURA_PORTONE =12, /* %M12 */
+  APERTURA_PARZIALE =96, /* %M96 */
+  APERTURA_TOTALE =97, /* %M97 */
+  /* Cicalini */
+  CICALINO_AUTOCLAVE =60, /* %M60 */
+  CICALINO_POMPA_POZZO =61 /* %M61 */
+};
 
-/* BOBINE DEI PULSANTI COMANDABILI DA ESTERNO: MAGELIS, INTERFACCIA A CARATTERI */
-#define LUCI_ESTERNE_SOTTO 2 /* %M2 */
-#define LUCI_CUN_LUN 3 /* %M3 */
-#define LUCI_CUN_COR 4 /* %M4 */
-#define LUCI_TAVERNA 5 /* %M5 */
-#define LUCI_GARAGE 6 /* %M6 */
-#define LUCI_STUDIO_SOTTO 7 /* %M7 */
-#define LUCI_ANDRONE_SCALE 8 /* %M8 */
-#define LUCI_CANTINETTA 10 /* %M10 */
-#define SERRATURA_PORTONE 12 /* %M12 */
-#define APERTURA_PARZIALE 96 /* %M96 */
-#define APERTURA_TOTALE 97 /* %M97 */
-/* Cicalini */
-#define CICALINO_AUTOCLAVE 60 /* %M60 */
-#define CICALINO_POMPA_POZZO 61 /* %M61 */
-/*========================================*/
 
-static int callback_http(struct libwebsocket_context * this,
-                         struct libwebsocket *wsi,
-                         enum libwebsocket_callback_reasons reason, void *user,
-                         void *in, size_t len)
-{
-  return 0;
-}
 
-/* holds random int between 0 and 19 */
 static volatile float V,I,P,Bar,Bar_pozzo;
 static volatile uint16_t io1,io2;
 
@@ -80,7 +75,17 @@ int pulsante(modbus_t *m,int bobina) {
   return 0;
 }
 
+/*==============================CALLBACKs===========================================================*/
+static int callback_http(struct libwebsocket_context * this,
+                         struct libwebsocket *wsi,
+                         enum libwebsocket_callback_reasons reason, void *user,
+                         void *in, size_t len)
+{
+  return 0;
+}
 
+
+/*****> ENERGY */
 static int callback_energy(struct libwebsocket_context * this,
 			   struct libwebsocket *wsi,
 			   enum libwebsocket_callback_reasons reason,
@@ -164,7 +169,7 @@ static int callback_energy(struct libwebsocket_context * this,
       modbus_free(mbw);
       return -1;
     }
-    pulsante(mbw,LUCI_CANTINETTA);
+    //    pulsante(mbw,getbobina((char *)in));
     fprintf(stderr, "rx %s\n", (char *)in);
     modbus_close(mbw);
     modbus_free(mbw);    
@@ -177,13 +182,59 @@ static int callback_energy(struct libwebsocket_context * this,
   return 0;
 }
 
+/*****>  spie_bobine*/
+static int callback_spie_bobine(struct libwebsocket_context * this,
+			   struct libwebsocket *wsi,
+			   enum libwebsocket_callback_reasons reason,
+			   void *user,
+			   void *in,
+			   size_t len)
+{
+  int n,m;
+
+  unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+1024+LWS_SEND_BUFFER_POST_PADDING];
+  unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
+
+  switch (reason) {
+
+  case LWS_CALLBACK_ESTABLISHED: // just log message that someone is connecting
+    printf("connection established for spie_bobine\n");
+    break;
+    
+  case LWS_CALLBACK_SERVER_WRITEABLE:
+    n = sprintf((char *)p,spie_bobine);
+    m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
+    printf("constants spie and bobine sent\n");
+    if (m < n) {
+      lwsl_err("ERROR %d writing to di socket spie_bobine (returned %d)\n", n,m);
+      return -1;
+    }    
+    break;
+  case LWS_CALLBACK_CLOSED:
+    printf("connection *CLOSED* for spie_bobine\n");
+    break;
+  default:
+    break;
+  }
+  
+  return 0;
+}  
+
+/*============================END CALBACKs======================================*/
+
+
+/*============================PROTOCOLS=========================================*/
 enum protocols {
 	/* always first */
 	PROTOCOL_HTTP = 0,
+
 	PROTOCOL_ENERGY,
+	PROTOCOL_SPIE_BOBINE,
+
 	/* always last */
 	DEMO_PROTOCOL_COUNT
 };
+
 
 static struct libwebsocket_protocols protocols[] = {
   /* first protocol must always be HTTP handler */
@@ -198,13 +249,32 @@ static struct libwebsocket_protocols protocols[] = {
     0                  // we don't use any per session data
   },
   {
+    "spie_bobine", // protocol name - very important!
+    callback_spie_bobine,   // callback
+    0                  // we don't use any per session data
+  },
+
+  {
     NULL,
     NULL,
     0   /* End of list */
   }
 };
+/*==========================================================================*/
 
+
+
+
+
+
+
+/*============================MAIN==============================================*/
 int main(void) {
+
+  /*
+  printf("%s\n\n",spie_bobine2);
+  exit(0);
+  */
 
   modbus_t *mb;
   uint16_t tab_reg[15]; // max 15 reg. in realtà ne servono 12
@@ -218,7 +288,7 @@ int main(void) {
   }
 
   // server url will be http://localhost:9999
-  int port = 81;
+  int port = 8081;
   int n = 0;
   unsigned int ms, oldms = 0;
   struct libwebsocket_context *context;
@@ -248,6 +318,8 @@ int main(void) {
   
   printf("starting server...\n");  
   // infinite loop, to end this server send SIGTERM. (CTRL+C)
+
+
   while (n >= 0) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -272,6 +344,7 @@ int main(void) {
 	io2=tab_reg[1];
 
 	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_ENERGY]);
+	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_SPIE_BOBINE]);
       } else {
 	printf("ERR: modbus read registers..riprovo a creare il context\n");
 	modbus_close(mb);

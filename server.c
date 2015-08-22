@@ -5,6 +5,7 @@
 #include <libwebsockets.h>
 #include <math.h>
 #include <modbus.h>
+#include <oath.h>
 #include "server.h"
  
 enum bobine {
@@ -28,6 +29,7 @@ enum bobine {
 
 static volatile float V,I,P,Bar,Bar_pozzo;
 static volatile uint16_t io1,io2;
+char * tok;
 
 void printbitssimple(uint16_t n) {
   /*dato l'intero n stampa la rappresentazione binaria*/
@@ -99,48 +101,29 @@ static int callback_energy(struct libwebsocket_context * this,
 
   unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+1024+LWS_SEND_BUFFER_POST_PADDING];
   unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
-
+  // le tre libwebsocket_callback_on_writable sostituiscono quelle nel main che erano presenti in precedenza
   switch (reason) {
 
   case LWS_CALLBACK_ESTABLISHED: // just log message that someone is connecting
-    printf("connection established\n");
+    fprintf(stderr,"connection established fo *energy*\n");
+    libwebsocket_callback_on_writable(this,wsi);    // comincia tutto il processo richiedendo la disponibilità a scrivere sul socket
     break;
 
-  case LWS_CALLBACK_RECEIVE: 
+  case LWS_CALLBACK_RECEIVE: // il browser ha fatto una websocket.send e il valore è nella variabile *in*
     mbw = modbus_new_tcp("192.168.1.157", 502);
     if (modbus_connect(mbw) == -1) {
       fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
       modbus_free(mbw);
       return -1;
     }
-
     fprintf(stderr, "bobina da accendere: %d\n", atoi((char *)in));
     pulsante(mbw,atoi((char *)in));
     modbus_close(mbw);
     modbus_free(mbw);    
+    libwebsocket_callback_on_writable(this,wsi);    // richiedi la disponibilità a scrivere
     break;
     
-  case LWS_CALLBACK_SERVER_WRITEABLE:
-    /* INPUT */
-    /* INGRESSI: NOME bit della word %MW65 del PLC
-       AUTOCLAVE 0
-       POMPA_SOMMERSA 1
-       RIEMPIMENTO 2
-       LUCI_ESTERNE_SOTTO 3
-       CENTR_R8 4
-       LUCI_GARAGE_DA_4 5
-       LUCI_GARAGE_DA_2 6
-       LUCI_TAVERNA_1_di_2 7
-       LUCI_TAVERNA_2_di_2 8
-       INTERNET 9
-       C9912 10
-       LUCI_CUN_LUN 11
-       LUCI_CUN_COR 12
-       LUCI_STUDIO_SOTTO 13
-       LUCI_ANDRONE_SCALE 14
-       GENERALE_AUTOCLAVE 15
-       LUCI_CANTINETTA 16
-    */
+  case LWS_CALLBACK_SERVER_WRITEABLE: // faccio la write appena il socket è disponibile. In questo modo implemeto il push dei dati
     n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
 \"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,\
 \"Stati\":{\"AUTOCLAVE\":%d,\"POMPA_SOMMERSA\":%d,\"RIEMPIMENTO\":%d,\"LUCI_ESTERNE_SOTTO\":%d,\"CENTR_R8\":%d,\"LUCI_GARAGE_DA_4\":%d,\"LUCI_GARAGE_DA_2\":%d,\"LUCI_TAVERNA_1_di_2\":%d,\"LUCI_TAVERNA_2_di_2\":%d,\"INTERNET\":%d,\"C9912\":%d,\
@@ -164,16 +147,19 @@ static int callback_energy(struct libwebsocket_context * this,
 		read_single_state((uint16_t)io1,(uint16_t)15), // generale autoclave
 		read_single_state((uint16_t)io2,(uint16_t)0) // luce cantinetta
     );
-
-    //    printbitssimple((uint16_t)io2);
-
-    //    n = sprintf((char *)p, "{Energia:{V:%3.1f,I:%2.1f,P:%4.0f},Bar:%2.2f,Bar_pozzo=%2.2f}", V,I,P,Bar,Bar_pozzo);
     m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
     if (m < n) {
       lwsl_err("ERROR %d writing to di socket (returned %d)\n", n,m);
       return -1;
     }
+    usleep((useconds_t)50000); // 50 ms di pausa altrimenti il browser non gli sta dietro e si rallenta
+    libwebsocket_callback_on_writable(this,wsi);    // richiedi di nuovo la disponibilità a scrivere
     break;
+
+  case LWS_CALLBACK_CLOSED:
+    fprintf(stderr,"connection *CLOSED* for energy\n");
+    break;
+
       
     default:
     break;
@@ -196,15 +182,16 @@ static int callback_spie_bobine(struct libwebsocket_context * this,
   unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 
   switch (reason) {
-
+    // faccio solo una chiamata a server_writeable perchè invio solo una volta i valori
   case LWS_CALLBACK_ESTABLISHED: // just log message that someone is connecting
-    printf("connection established for spie_bobine\n");
+    fprintf(stderr,"connection established for spie_bobine\n");
+    libwebsocket_callback_on_writable(this,wsi); // chiede la disponibilità a scrivere sul socket
     break;
     
-  case LWS_CALLBACK_SERVER_WRITEABLE:
+  case LWS_CALLBACK_SERVER_WRITEABLE: // se c'è un socket aperto e questo è disponibile, scrivo il valore
     n = sprintf((char *)p,spie_bobine);
     m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
-    printf("constants spie and bobine sent\n");
+    fprintf(stderr,"constants spie and bobine sent\n");
     if (m < n) {
       lwsl_err("ERROR %d writing to di socket spie_bobine (returned %d)\n", n,m);
       return -1;
@@ -212,7 +199,78 @@ static int callback_spie_bobine(struct libwebsocket_context * this,
     break;
 
   case LWS_CALLBACK_CLOSED:
-    printf("connection *CLOSED* for spie_bobine\n");
+    fprintf(stderr,"connection *CLOSED* for spie_bobine\n");
+    break;
+  default:
+    break;
+  }
+  
+  return 0;
+}
+
+static int callback_totp(struct libwebsocket_context * this,
+			   struct libwebsocket *wsi,
+			   enum libwebsocket_callback_reasons reason,
+			   void *user,
+			   void *in,
+			   size_t len)
+{
+  int n,m;
+
+  unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+1024+LWS_SEND_BUFFER_POST_PADDING];
+  unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
+
+  switch (reason) {
+    
+  case LWS_CALLBACK_ESTABLISHED: // just log message that someone is connecting
+    printf("connection established for TOTP\n");
+    
+    break;
+    
+  case LWS_CALLBACK_SERVER_WRITEABLE:
+
+    n = sprintf((char *)p,tok); // la variabile globale tok contiene il token ricevuto nella callback receive
+    m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
+    if (m < n) {
+      lwsl_err("ERROR %d writing to di socket totp (returned %d)\n", n,m);
+      return -1;
+    }    
+#define CHECK
+#ifdef CHECK
+    /*
+      Qui le routine per il controllo della validità del token
+     */
+    char * sec="ipadsmf01";
+    size_t seclen;
+    time_t now, t0, time_step_size;
+    int valid;
+    seclen = (size_t)(strlen(sec)+1);
+    time_step_size=OATH_TOTP_DEFAULT_TIME_STEP_SIZE;
+    t0=OATH_TOTP_DEFAULT_START_TIME;
+    now=time(NULL);
+    valid=oath_totp_validate (sec, //const char *secret,
+			   seclen, //size_t secret_length,
+			   now, // time_t now,
+			   time_step_size, //unsigned  time_step_size,
+			   t0, // time_t start_offset,
+			   0,//size_t window,
+			   tok //const char *otp
+    );
+    printf("-->%d\n",valid);
+    if (valid==OATH_INVALID_OTP) {printf("INVALID\n");} else  {printf("VALID\n");}
+#endif
+    fprintf(stderr,"ti ho rimandato questo token: %s\n",tok);
+    break;
+
+  case LWS_CALLBACK_RECEIVE: // il browser ha fatto una websocket.send e il valore è nella variabile *in*
+    tok=malloc(sizeof(char)*len+1);
+    strcpy(tok,(char *)in); // mi memorizzo il token ricevuto in una variabile globale
+    fprintf(stderr, "valore del token ricevuto: %s\n", (char *)in);
+    libwebsocket_callback_on_writable(this,wsi);    // richiedi di la disponibilità a scrivere        
+    break;
+
+  case LWS_CALLBACK_CLOSED:
+    printf("connection *CLOSED* for TOTP\n");
     break;
   default:
     break;
@@ -231,6 +289,7 @@ enum protocols {
 
 	PROTOCOL_ENERGY,
 	PROTOCOL_SPIE_BOBINE,
+	PROTOCOL_TOTP,
 
 	/* always last */
 	DEMO_PROTOCOL_COUNT
@@ -254,6 +313,11 @@ static struct libwebsocket_protocols protocols[] = {
     callback_spie_bobine,   // callback
     0                  // we don't use any per session data
   },
+  {
+    "totp", // protocol name - very important!
+    callback_totp,   // callback
+    0                  // we don't use any per session data
+  },
 
   {
     NULL,
@@ -272,10 +336,6 @@ static struct libwebsocket_protocols protocols[] = {
 /*============================MAIN==============================================*/
 int main(void) {
 
-  /*
-  printf("%s\n\n",spie_bobine2);
-  exit(0);
-  */
 
   modbus_t *mb;
   uint16_t tab_reg[15]; // max 15 reg. in realtà ne servono 12
@@ -344,8 +404,10 @@ int main(void) {
 	io1=tab_reg[0];
 	io2=tab_reg[1];
 
-	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_ENERGY]);
-	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_SPIE_BOBINE]);
+	//libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_ENERGY]);
+	//	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_SPIE_BOBINE]);
+	//	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_TOTP]);
+
       } else {
 	printf("ERR: modbus read registers..riprovo a creare il context\n");
 	modbus_close(mb);

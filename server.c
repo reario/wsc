@@ -280,7 +280,11 @@ static int callback_totp(struct libwebsocket_context * this,
 }  
 
 /*============================END CALBACKs======================================*/
-
+init pippo() {
+	
+	return 45;
+	
+}
 
 /*============================PROTOCOLS=========================================*/
 enum protocols {

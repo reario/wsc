@@ -22,7 +22,7 @@ enum bobine {
   APERTURA_TOTALE =97, /* %M97 */
   /* Cicalini */
   CICALINO_AUTOCLAVE =60, /* %M60 */
-  CICALINO_POMPA_POZZO =61 /* %M61 beep lungo*/
+  CICALINO_POMPA_POZZO =61 /* %M61 beep lungo */
 };
 
 

@@ -9,6 +9,7 @@
 #include "server.h"
 // lkjljlkjl
 enum bobine {
+<<<<<<< HEAD
 	LUCI_ESTERNE_SOTTO = 2, /* %M2 */
 	LUCI_CUN_LUN = 3, /* %M3 */
 	LUCI_CUN_COR = 4, /* %M4 */
@@ -23,6 +24,22 @@ enum bobine {
 	/* Cicalini */
 	CICALINO_AUTOCLAVE = 60, /* %M60 */
 	CICALINO_POMPA_POZZO = 61 /* %M61 */
+=======
+  LUCI_ESTERNE_SOTTO = 2, /* %M2 */
+  LUCI_CUN_LUN =3, /* %M3 */
+  LUCI_CUN_COR =4, /* %M4 */
+  LUCI_TAVERNA =5, /* %M5 */
+  LUCI_GARAGE =6, /* %M6 */
+  LUCI_STUDIO_SOTTO =7, /* %M7 */
+  LUCI_ANDRONE_SCALE =8, /* %M8 */
+  LUCI_CANTINETTA =10, /* %M10 */
+  SERRATURA_PORTONE =12, /* %M12 */
+  APERTURA_PARZIALE =96, /* %M96 */
+  APERTURA_TOTALE =97, /* %M97 */
+  /* Cicalini */
+  CICALINO_AUTOCLAVE =60, /* %M60 */
+  CICALINO_POMPA_POZZO =61 /* %M61 beep lungo */
+>>>>>>> 30508833ac693958a51a69ff9dbce8bb3b72a16b
 };
 
 static volatile float V, I, P, Bar, Bar_pozzo;

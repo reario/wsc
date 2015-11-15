@@ -10,7 +10,7 @@ LIBDIR = /home/reario/lib
 
 all : server
 
-server :  server.o
+server :  server.h server.o
 	$(CC) -Wall -I${INCDIR} -I${INCDIR}/modbus -I${INCDIR}/liboath -L${LIBDIR} -lmodbus -lwebsockets -loath $^ -o $@
 
 .c.o :

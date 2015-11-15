@@ -7,26 +7,9 @@
 #include <modbus.h>
 #include <oath.h>
 #include "server.h"
-// lkjljlkjl
-enum bobine {
-  LUCI_ESTERNE_SOTTO = 2, /* %M2 */
-  LUCI_CUN_LUN =3, /* %M3 */
-  LUCI_CUN_COR =4, /* %M4 */
-  LUCI_TAVERNA =5, /* %M5 */
-  LUCI_GARAGE =6, /* %M6 */
-  LUCI_STUDIO_SOTTO =7, /* %M7 */
-  LUCI_ANDRONE_SCALE =8, /* %M8 */
-  LUCI_CANTINETTA =10, /* %M10 */
-  SERRATURA_PORTONE =12, /* %M12 */
-  APERTURA_PARZIALE =96, /* %M96 */
-  APERTURA_TOTALE =97, /* %M97 */
-  /* Cicalini */
-  CICALINO_AUTOCLAVE =60, /* %M60 */
-  CICALINO_POMPA_POZZO =61 /* %M61 beep lungo pippo */
-};
 
 static volatile float V, I, P, Bar, Bar_pozzo;
-static volatile uint16_t io1, io2;
+static volatile uint16_t io1, io2, OTBDIN;;
 char * tok;
 
 void printbitssimple(uint16_t n) {
@@ -68,7 +51,6 @@ int pulsante(modbus_t *m, int bobina) {
 		printf("ERRORE DI SCRITTURA:PULSANTE ON");
 		return -1;
 	}
-
 	sleep(1);
 
 	if (modbus_write_bit(m, bobina, FALSE) != 1) {
@@ -123,30 +105,34 @@ static int callback_energy(struct libwebsocket_context * this,
 		libwebsocket_callback_on_writable(this,wsi); // richiedi la disponibilità a scrivere
 		break;
 
-		case LWS_CALLBACK_SERVER_WRITEABLE:// faccio la write appena il socket è disponibile. In questo modo implemeto il push dei dati
-		n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
-\"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,\
-\"Stati\":{\"AUTOCLAVE\":%d,\"POMPA_SOMMERSA\":%d,\"RIEMPIMENTO\":%d,\"LUCI_ESTERNE_SOTTO\":%d,\"CENTR_R8\":%d,\"LUCI_GARAGE_DA_4\":%d,\"LUCI_GARAGE_DA_2\":%d,\"LUCI_TAVERNA_1_di_2\":%d,\"LUCI_TAVERNA_2_di_2\":%d,\"INTERNET\":%d,\"C9912\":%d,\
-\"LUCI_CUN_LUN\":%d,\"LUCI_CUN_COR\":%d,\"LUCI_STUDIO_SOTTO\":%d,\"LUCI_ANDRONE_SCALE\":%d,\"GENERALE_AUTOCLAVE\":%d,\"LUCI_CANTINETTA\":%d}}",
-				V,I,P,Bar,Bar_pozzo,io1,io2,
-				read_single_state((uint16_t)io1,(uint16_t)0),// autoclave
-				read_single_state((uint16_t)io1,(uint16_t)1),// Pompa pozzo
-				read_single_state((uint16_t)io1,(uint16_t)2),// Riempimento serbatorio
-				read_single_state((uint16_t)io1,(uint16_t)3),// luci esterne
-				read_single_state((uint16_t)io1,(uint16_t)4),// R8 centralino
-				read_single_state((uint16_t)io1,(uint16_t)5),// luci garage da 4
-				read_single_state((uint16_t)io1,(uint16_t)6),// luci garage da 2
-				read_single_state((uint16_t)io1,(uint16_t)7),// taverna1
-				read_single_state((uint16_t)io1,(uint16_t)8),// taverna2
-				read_single_state((uint16_t)io1,(uint16_t)9),// internet
-				read_single_state((uint16_t)io1,(uint16_t)10),// Centralino 9912 (luci esterne da centralino)
-				read_single_state((uint16_t)io1,(uint16_t)11),// Cunicolo lungo
-				read_single_state((uint16_t)io1,(uint16_t)12),// Cunicolo corto
-				read_single_state((uint16_t)io1,(uint16_t)13),// luci studio sotto
-				read_single_state((uint16_t)io1,(uint16_t)14),// luci androne scale
-				read_single_state((uint16_t)io1,(uint16_t)15),// generale autoclave
-				read_single_state((uint16_t)io2,(uint16_t)0)// luce cantinetta
+		case LWS_CALLBACK_SERVER_WRITEABLE:
+		  // faccio la write per aggiornare lo stato delle spie appena il socket è disponibile. In questo modo implemeto il push dei dati
+		  n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
+\"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,		\
+\"Stati\":{\"AUTOCLAVE\":%d,\"POMPA_SOMMERSA\":%d,\"RIEMPIMENTO\":%d,\"LUCI_ESTERNE_SOTTO\":%d,\"CENTR_R8\":%d,\"LUCI_GARAGE_DA_4\":%d,\"LUCI_GARAGE_DA_2\":%d,\"LUCI_TAVERNA_1_di_2\":%d,\"LUCI_TAVERNA_2_di_2\":%d,\"INTERNET\":%d,\"C9912\":%d, \
+\"LUCI_CUN_LUN\":%d,\"LUCI_CUN_COR\":%d,\"LUCI_STUDIO_SOTTO\":%d,\"LUCI_ANDRONE_SCALE\":%d,\"GENERALE_AUTOCLAVE\":%d,\"LUCI_CANTINETTA\":%d, \
+\"FARETTI\":%d}}",
+			      V,I,P,Bar,Bar_pozzo,io1,io2,
+			      read_single_state((uint16_t)io1,(uint16_t)0),// stato autoclave
+			      read_single_state((uint16_t)io1,(uint16_t)1),// stato Pompa pozzo
+			      read_single_state((uint16_t)io1,(uint16_t)2),// stato Riempimento serbatorio
+			      read_single_state((uint16_t)io1,(uint16_t)3),// stato luci esterne
+			      read_single_state((uint16_t)io1,(uint16_t)4),//  stato R8 centralino
+			      read_single_state((uint16_t)io1,(uint16_t)5),//  stato luci garage da 4
+			      read_single_state((uint16_t)io1,(uint16_t)6),//  stato luci garage da 2
+			      read_single_state((uint16_t)io1,(uint16_t)7),//  stato taverna1
+			      read_single_state((uint16_t)io1,(uint16_t)8),//  stato taverna2
+			      read_single_state((uint16_t)io1,(uint16_t)9),//  stato internet
+			      read_single_state((uint16_t)io1,(uint16_t)10),//  stato Centralino 9912 (luci esterne da centralino)
+			      read_single_state((uint16_t)io1,(uint16_t)11),//  stato Cunicolo lungo
+			      read_single_state((uint16_t)io1,(uint16_t)12),//  stato Cunicolo corto
+			      read_single_state((uint16_t)io1,(uint16_t)13),//  stato luci studio sotto
+			      read_single_state((uint16_t)io1,(uint16_t)14),//  stato luci androne scale
+			      read_single_state((uint16_t)io1,(uint16_t)15),//  stato generale autoclave
+			      read_single_state((uint16_t)io2,(uint16_t)0), //  stato luce cantinetta
+			      read_single_state((uint16_t)OTBDIN,(uint16_t)11)//  stato luce FARI ESTERNI
 		);
+
 		m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
 		if (m < n) {
 			lwsl_err("ERROR %d writing to di socket (returned %d)\n", n,m);
@@ -168,13 +154,17 @@ static int callback_energy(struct libwebsocket_context * this,
 }
 
 /*****>  spie_bobine*/
-static int callback_spie_bobine(struct libwebsocket_context * this,
-		struct libwebsocket *wsi,
-		enum libwebsocket_callback_reasons reason,
-		void *user,
-		void *in,
-		size_t len)
+static int callback_spie_bobine(
+  struct libwebsocket_context * this,
+  struct libwebsocket *wsi,
+  enum libwebsocket_callback_reasons reason,
+  void *user,
+  void *in,
+  size_t len)
 {
+  /* questa callback invia al client (browser) la lista delle spie e delle bobine in bodo che il browser crei la maschera relativa 
+     la variabile è contenuta dentro la stringa JSON "spie_bobine"
+   */
 	int n,m;
 
 	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+1024+LWS_SEND_BUFFER_POST_PADDING];
@@ -187,16 +177,16 @@ static int callback_spie_bobine(struct libwebsocket_context * this,
 		libwebsocket_callback_on_writable(this,wsi);// chiede la disponibilità a scrivere sul socket
 		break;
 
-		case LWS_CALLBACK_SERVER_WRITEABLE:// se c'è un socket aperto e questo è disponibile, scrivo il valore
+		case LWS_CALLBACK_SERVER_WRITEABLE:// se c'è un socket aperto e questo è disponibile, invio la lista delle spie e bobine
 		n = sprintf((char *)p,spie_bobine);
 		m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
 		fprintf(stderr,"constants spie and bobine sent\n");
 		if (m < n) {
-			lwsl_err("ERROR %d writing to di socket spie_bobine (returned %d)\n", n,m);
-			return -1;
+		  lwsl_err("ERROR %d writing to di socket spie_bobine (returned %d)\n", n,m);
+		  return -1;
 		}
 		break;
-
+		
 		case LWS_CALLBACK_CLOSED:
 		fprintf(stderr,"connection *CLOSED* for spie_bobine\n");
 		break;
@@ -372,18 +362,19 @@ while (n >= 0) {
 		/* Read 12 registers from the address 65 */
 
 		if (modbus_read_registers(mb, 65, 12, tab_reg) > 0) {
-			V=(float)(tab_reg[6]+(tab_reg[5]<<16))/1000;
-			I=(float)(tab_reg[4]+(tab_reg[3]<<16))/1000;
-			P=(float)(tab_reg[8]+(tab_reg[7]<<16))/100;
-			Bar=(float)(tab_reg[10]*0.002442);;
-			Bar_pozzo=(float)(tab_reg[11]*0.002442);
-			io1=tab_reg[0];
-			io2=tab_reg[1];
 
-			//libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_ENERGY]);
-			//	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_SPIE_BOBINE]);
-			//	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_TOTP]);
+		  // VALORI DIGITALI (PLC + OTB). Questi valori sono usati nelle callback 
+		  io1=tab_reg[0];
+		  io2=tab_reg[1];
+		  OTBDIN=tab_reg[9]; // ingressi digitali OTB che il PLC ha passato al PC nella posizione 9 di tab_reg[].
 
+		  // VALORI ANALOGICI (PM9 + OTB)
+		  I=(float)(tab_reg[4]+(tab_reg[3]<<16))/1000; // PM9        
+		  V=(float)(tab_reg[6]+(tab_reg[5]<<16))/1000; // PM9        
+		  P=(float)(tab_reg[8]+(tab_reg[7]<<16))/100;  // PM9        
+		  Bar=(float)(tab_reg[10]*0.002442); // INPUT ANALOGICO OTB
+		  Bar_pozzo=(float)(tab_reg[11]*0.002442); // INPUT ANALOGICO OTB
+		  
 		} else {
 			printf("ERR: modbus read registers..riprovo a creare il context\n");
 			modbus_close(mb);

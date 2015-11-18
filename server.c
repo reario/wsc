@@ -6,6 +6,7 @@
 #include <math.h>
 #include <modbus.h>
 #include <oath.h>
+#include "json.h"
 #include "server.h"
 
 static volatile float V, I, P, Bar, Bar_pozzo;
@@ -60,6 +61,42 @@ int pulsante(modbus_t *m, int bobina) {
 	return 0;
 }
 
+
+
+
+/*==============================READ JSON FILE===========================================================*/
+char * readconfig(char *file) {
+
+  char *buffer;
+  FILE *fh = fopen(file, "rb");
+  if ( fh != NULL )
+    {
+      fseek(fh, 0L, SEEK_END);
+      long s = ftell(fh);
+      rewind(fh);
+      buffer = malloc(s);
+      if ( buffer != NULL )
+	{
+	  fread(buffer, s, 1, fh);
+	  // we can now close the file
+	  fclose(fh); fh = NULL;
+ 
+	  // do something, e.g.
+	  //fwrite(buffer, s, 1, stdout);
+ 
+	  //free(buffer);
+	}
+      if (fh != NULL) fclose(fh);
+    }
+  return buffer;
+}  
+
+/*==============================Estraggo i SoBs===========================================================*/
+
+
+
+
+
 /*==============================CALLBACKs===========================================================*/
 static int callback_http(struct libwebsocket_context * this,
 		struct libwebsocket *wsi,
@@ -80,76 +117,83 @@ static int callback_energy(struct libwebsocket_context * this,
 {
 	int n,m;
 	modbus_t *mbw;
+	uint16_t rele;
+	char PLC_IP[] = "192.168.1.157";
+	char OTB_IP[] = "192.168.1.11";
 
 	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+1024+LWS_SEND_BUFFER_POST_PADDING];
 	unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	// le tre libwebsocket_callback_on_writable sostituiscono quelle nel main che erano presenti in precedenza
 	switch (reason) {
 
-		case LWS_CALLBACK_ESTABLISHED: // just log message that someone is connecting
-		fprintf(stderr,"connection established fo *energy*\n");
-		libwebsocket_callback_on_writable(this,wsi);// comincia tutto il processo richiedendo la disponibilità a scrivere sul socket
-		break;
-
-		case LWS_CALLBACK_RECEIVE:// il browser ha fatto una websocket.send e il valore è nella variabile *in*
-		mbw = modbus_new_tcp("192.168.1.157", 502);
-		if (modbus_connect(mbw) == -1) {
-			fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
-			modbus_free(mbw);
-			return -1;
-		}
-		fprintf(stderr, "bobina da accendere: %d\n", atoi((char *)in));
-		pulsante(mbw,atoi((char *)in));
-		modbus_close(mbw);
-		modbus_free(mbw);
-		libwebsocket_callback_on_writable(this,wsi); // richiedi la disponibilità a scrivere
-		break;
-
-		case LWS_CALLBACK_SERVER_WRITEABLE:
-		  // faccio la write per aggiornare lo stato delle spie appena il socket è disponibile. In questo modo implemeto il push dei dati
-		  n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
+	case LWS_CALLBACK_ESTABLISHED: // just log message that someone is connecting
+	  fprintf(stderr,"connection established fo *energy*\n");
+	  libwebsocket_callback_on_writable(this,wsi);// comincia tutto il processo richiedendo la disponibilità a scrivere sul socket
+	  break;
+	  
+	case LWS_CALLBACK_RECEIVE:// il browser ha fatto una websocket.send e il valore è nella variabile *in*
+	  
+	  rele=atoi((char *)in);
+	  //	  if ((rele-1000)>=0) {mbserver[]="192.168.1.11"}
+	  
+	  mbw = modbus_new_tcp((rele-1000)>=0?OTB_IP:PLC_IP, 502);
+	  if (modbus_connect(mbw) == -1) {
+	    fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
+	    modbus_free(mbw);
+	    return -1;
+	  }
+	  fprintf(stderr, "bobina da accendere: %d\n", atoi((char *)in));
+	  pulsante(mbw,atoi((char *)in));
+	  modbus_close(mbw);
+	  modbus_free(mbw);
+	  libwebsocket_callback_on_writable(this,wsi); // richiedi la disponibilità a scrivere
+	  break;
+	  
+	case LWS_CALLBACK_SERVER_WRITEABLE:
+	  // faccio la write per aggiornare lo stato delle spie appena il socket è disponibile. In questo modo implemeto il push dei dati
+	  n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\
 \"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,		\
 \"Stati\":{\"AUTOCLAVE\":%d,\"POMPA_SOMMERSA\":%d,\"RIEMPIMENTO\":%d,\"LUCI_ESTERNE_SOTTO\":%d,\"CENTR_R8\":%d,\"LUCI_GARAGE_DA_4\":%d,\"LUCI_GARAGE_DA_2\":%d,\"LUCI_TAVERNA_1_di_2\":%d,\"LUCI_TAVERNA_2_di_2\":%d,\"INTERNET\":%d,\"C9912\":%d, \
 \"LUCI_CUN_LUN\":%d,\"LUCI_CUN_COR\":%d,\"LUCI_STUDIO_SOTTO\":%d,\"LUCI_ANDRONE_SCALE\":%d,\"GENERALE_AUTOCLAVE\":%d,\"LUCI_CANTINETTA\":%d, \
 \"FARETTI\":%d}}",
-			      V,I,P,Bar,Bar_pozzo,io1,io2,
-			      read_single_state((uint16_t)io1,(uint16_t)0),// stato autoclave
-			      read_single_state((uint16_t)io1,(uint16_t)1),// stato Pompa pozzo
-			      read_single_state((uint16_t)io1,(uint16_t)2),// stato Riempimento serbatorio
-			      read_single_state((uint16_t)io1,(uint16_t)3),// stato luci esterne
-			      read_single_state((uint16_t)io1,(uint16_t)4),//  stato R8 centralino
-			      read_single_state((uint16_t)io1,(uint16_t)5),//  stato luci garage da 4
-			      read_single_state((uint16_t)io1,(uint16_t)6),//  stato luci garage da 2
-			      read_single_state((uint16_t)io1,(uint16_t)7),//  stato taverna1
-			      read_single_state((uint16_t)io1,(uint16_t)8),//  stato taverna2
-			      read_single_state((uint16_t)io1,(uint16_t)9),//  stato internet
-			      read_single_state((uint16_t)io1,(uint16_t)10),//  stato Centralino 9912 (luci esterne da centralino)
-			      read_single_state((uint16_t)io1,(uint16_t)11),//  stato Cunicolo lungo
-			      read_single_state((uint16_t)io1,(uint16_t)12),//  stato Cunicolo corto
-			      read_single_state((uint16_t)io1,(uint16_t)13),//  stato luci studio sotto
-			      read_single_state((uint16_t)io1,(uint16_t)14),//  stato luci androne scale
-			      read_single_state((uint16_t)io1,(uint16_t)15),//  stato generale autoclave
-			      read_single_state((uint16_t)io2,(uint16_t)0), //  stato luce cantinetta
-			      read_single_state((uint16_t)OTBDIN,(uint16_t)11)//  stato luce FARI ESTERNI
-		);
-
-		m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
-		if (m < n) {
-			lwsl_err("ERROR %d writing to di socket (returned %d)\n", n,m);
-			return -1;
-		}
-		usleep((useconds_t)50000); // 50 ms di pausa altrimenti il browser non gli sta dietro e si rallenta
-		libwebsocket_callback_on_writable(this,wsi);// richiedi di nuovo la disponibilità a scrivere
-		break;
-
-		case LWS_CALLBACK_CLOSED:
-		fprintf(stderr,"connection *CLOSED* for energy\n");
-		break;
-
-		default:
-		break;
+		      V,I,P,Bar,Bar_pozzo,io1,io2,
+		      read_single_state((uint16_t)io1,(uint16_t)0),// stato autoclave
+		      read_single_state((uint16_t)io1,(uint16_t)1),// stato Pompa pozzo
+		      read_single_state((uint16_t)io1,(uint16_t)2),// stato Riempimento serbatorio
+		      read_single_state((uint16_t)io1,(uint16_t)3),// stato luci esterne
+		      read_single_state((uint16_t)io1,(uint16_t)4),//  stato R8 centralino
+		      read_single_state((uint16_t)io1,(uint16_t)5),//  stato luci garage da 4
+		      read_single_state((uint16_t)io1,(uint16_t)6),//  stato luci garage da 2
+		      read_single_state((uint16_t)io1,(uint16_t)7),//  stato taverna1
+		      read_single_state((uint16_t)io1,(uint16_t)8),//  stato taverna2
+		      read_single_state((uint16_t)io1,(uint16_t)9),//  stato internet
+		      read_single_state((uint16_t)io1,(uint16_t)10),//  stato Centralino 9912 (luci esterne da centralino)
+		      read_single_state((uint16_t)io1,(uint16_t)11),//  stato Cunicolo lungo
+		      read_single_state((uint16_t)io1,(uint16_t)12),//  stato Cunicolo corto
+		      read_single_state((uint16_t)io1,(uint16_t)13),//  stato luci studio sotto
+		      read_single_state((uint16_t)io1,(uint16_t)14),//  stato luci androne scale
+		      read_single_state((uint16_t)io1,(uint16_t)15),//  stato generale autoclave
+		      read_single_state((uint16_t)io2,(uint16_t)0), //  stato luce cantinetta
+		      read_single_state((uint16_t)OTBDIN,(uint16_t)11)//  stato luce FARI ESTERNI
+	  );
+	  
+	  m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
+	  if (m < n) {
+	    lwsl_err("ERROR %d writing to di socket (returned %d)\n", n,m);
+	    return -1;
+	  }
+	  usleep((useconds_t)50000); // 50 ms di pausa altrimenti il browser non gli sta dietro e si rallenta
+	  libwebsocket_callback_on_writable(this,wsi);// richiedi di nuovo la disponibilità a scrivere
+	  break;
+	  
+	case LWS_CALLBACK_CLOSED:
+	  fprintf(stderr,"connection *CLOSED* for energy\n");
+	  break;
+	  
+	default:
+	  break;
 	}
-
+	
 	return 0;
 }
 
@@ -335,8 +379,8 @@ struct lws_context_creation_info context_info =
 	.ka_time = 0,
 	.ka_probes = 0,
 	.ka_interval = 0
-}
-;
+};
+
 // create libwebsocket context representing this server
 context = libwebsocket_create_context(&context_info);
 
@@ -345,18 +389,54 @@ if (context == NULL) {
 	return -1;
 }
 
-printf("starting server...\n");
-// infinite loop, to end this server send SIGTERM. (CTRL+C)
 
-while (n >= 0) {
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
+ printf("starting server...\n");
+ version();
+ // printf("%s\n",gh);
 
-	/*
-	 * This provokes the LWS_CALLBACK_SERVER_WRITEABLE for every
-	 * live websocket connection using the ENERGY protocol,
-	 * as soon as it can take more packets (usually immediately)
-	 */
+ /*****************************************************/
+ /* JSON STUFF */
+ /*****************************************************/
+ char *gh=readconfig("gh.json");
+ JsonNode *node=NULL;
+ JsonNode *SoBs=NULL;
+ JsonNode *SoB=NULL;
+ JsonNode *Energia=NULL;
+ node=json_decode(gh);
+
+ if (node == NULL) {
+   printf("Failed to decode \n");
+   exit(1);
+ }
+ char *id,*ip,*type,*funzione;
+ int rele,stato;
+ SoBs=json_find_member(node, "SoBs");
+   
+ json_foreach(SoB,SoBs) 
+   {
+     
+     id=json_find_member(SoB,"id")->string_;
+     ip=json_find_member(SoB,"ip")->string_;
+     type=json_find_member(SoB,"type")->string_;
+     funzione=json_find_member(SoB,"funzione")->string_;
+     rele=json_find_member(SoB,"rele")->number_;
+     stato=json_find_member(SoB,"stato")->number_;
+     printf("%s - %s - %s - %s - %i - %i\n",id,ip,type,funzione,rele,stato);
+   }
+ /*****************************************************/
+ 
+ 
+ // infinite loop, to end this server send SIGTERM. (CTRL+C)
+ 
+ while (n >= 0) {
+   struct timeval tv;
+   gettimeofday(&tv, NULL);
+   
+   /*
+    * This provokes the LWS_CALLBACK_SERVER_WRITEABLE for every
+    * live websocket connection using the ENERGY protocol,
+    * as soon as it can take more packets (usually immediately)
+    */
 	ms = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
 	if ((ms - oldms) > 50) {
 		/* Read 12 registers from the address 65 */

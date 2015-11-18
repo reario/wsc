@@ -2,6 +2,7 @@
 *.o
 
 libwebsockets-1.4-chrome43-firefox-36/*
+ccan/*
 
 # Libraries
 *.lib
@@ -20,6 +21,7 @@ libwebsockets-1.4-chrome43-firefox-36/*
 *.app
 server
 bit
+conf
 
 # emacs
 *~

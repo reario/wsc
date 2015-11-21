@@ -229,7 +229,8 @@ static int callback_energy(struct libwebsocket_context * this,
 {
 	int n,m;
 	modbus_t *mbw;
-
+	JsonNode *Elem,*S;
+	
 	char PLC_IP[] = "192.168.1.157";
 	//	char OTB_IP[] = "192.168.1.11";
 
@@ -244,6 +245,16 @@ static int callback_energy(struct libwebsocket_context * this,
 	  break;
 	  
 	case LWS_CALLBACK_RECEIVE:// il browser ha fatto una websocket.send e il valore è nella variabile *in*
+	  S=json_find_member(node,"SoBs");
+	  Elem=json_find_member(S,(char *)in);
+
+	  //printf("%s\n",json_stringify(node,NULL));
+	  printf("-->>%s\n",(char *)in);
+	  if (Elem) {
+	    printf("IP=%s\nRele=%1.0lf\n",json_find_member(Elem,"ip")->string_,json_find_member(Elem,"rele")->number_);
+	  } else {printf("Ricevuto un comando non riconosciuto");}
+	  
+	  /* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */	  
 	  /* viene chiamata quando si clicca su una bobina*/
 	  mbw = modbus_new_tcp(PLC_IP, 502);
 	  if (modbus_connect(mbw) == -1) {
@@ -251,8 +262,10 @@ static int callback_energy(struct libwebsocket_context * this,
 	    modbus_free(mbw);
 	    return -1;
 	  }
+	  /* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
+
 	  fprintf(stderr, "bobina da accendere: %d\n", atoi((char *)in));
-	  pulsante(mbw,atoi((char *)in));
+	  //pulsante(mbw,atoi((char *)in));
 	  modbus_close(mbw);
 	  modbus_free(mbw);
 	  libwebsocket_callback_on_writable(this,wsi); // richiedi la disponibilità a scrivere
@@ -262,34 +275,7 @@ static int callback_energy(struct libwebsocket_context * this,
 
 
 	  // faccio la write per aggiornare lo stato delle spie appena il socket è disponibile. In questo modo implemeto il push dei dati
-
-	  /* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
-	  /*
-	    n = sprintf((char *)p,"{\"Energia\":{ \"V\":%3.1f,\"I\":%2.1f,\"P\":%1.2f},\"Bar\":%2.1f,\"Bar_pozzo\":%2.1f,\"IO1\":%d,\"IO2\":%d,\
-\"Stati\":{\"AUTOCLAVE\":%d,\"POMPA_SOMMERSA\":%d,\"RIEMPIMENTO\":%d,\"LUCI_ESTERNE_SOTTO\":%d,\"CENTR_R8\":%d,\"LUCI_GARAGE_DA_4\":%d,\"LUCI_GARAGE_DA_2\":%d,\"LUCI_TAVERNA_1_di_2\":%d,\"LUCI_TAVERNA_2_di_2\":%d,\"INTERNET\":%d,\"C9912\":%d,"LUCI_CUN_LUN\":%d,\"LUCI_CUN_COR\":%d,\"LUCI_STUDIO_SOTTO\":%d,\"LUCI_ANDRONE_SCALE\":%d,\"GENERALE_AUTOCLAVE\":%d,\"LUCI_CANTINETTA\":%d,"FARETTI\":%d}}",
-		      V,I,P,Bar,Bar_pozzo,io1,io2,
-		      read_single_state((uint16_t)io1,(uint16_t)0),// stato autoclave
-		      read_single_state((uint16_t)io1,(uint16_t)1),// stato Pompa pozzo
-		      read_single_state((uint16_t)io1,(uint16_t)2),// stato Riempimento serbatorio
-		      read_single_state((uint16_t)io1,(uint16_t)3),// stato luci esterne
-		      read_single_state((uint16_t)io1,(uint16_t)4),//  stato R8 centralino
-		      read_single_state((uint16_t)io1,(uint16_t)5),//  stato luci garage da 4
-		      read_single_state((uint16_t)io1,(uint16_t)6),//  stato luci garage da 2
-		      read_single_state((uint16_t)io1,(uint16_t)7),//  stato taverna1
-		      read_single_state((uint16_t)io1,(uint16_t)8),//  stato taverna2
-		      read_single_state((uint16_t)io1,(uint16_t)9),//  stato internet
-		      read_single_state((uint16_t)io1,(uint16_t)10),//  stato Centralino 9912 (luci esterne da centralino)
-		      read_single_state((uint16_t)io1,(uint16_t)11),//  stato Cunicolo lungo
-		      read_single_state((uint16_t)io1,(uint16_t)12),//  stato Cunicolo corto
-		      read_single_state((uint16_t)io1,(uint16_t)13),//  stato luci studio sotto
-		      read_single_state((uint16_t)io1,(uint16_t)14),//  stato luci androne scale
-		      read_single_state((uint16_t)io1,(uint16_t)15),//  stato generale autoclave
-		      read_single_state((uint16_t)io2,(uint16_t)0), //  stato luce cantinetta
-		      read_single_state((uint16_t)OTBDIN,(uint16_t)11)//  stato luce FARI ESTERNI
-	  );
-	  */
-	  /* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
-	  	  n=sprintf((char *)p,gh_current);
+	  n=sprintf((char *)p,gh_current);
 	  m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
 	  if (m < n) {
 	    lwsl_err("ERROR %d writing to di socket (returned %d)\n", n,m);

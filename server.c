@@ -9,94 +9,21 @@
 #include "json.h"
 #include "server.h"
 
-
-/* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
-static volatile uint16_t io1, io2, OTBDIN;;
-/* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
-
-#define QWORD 64
 static volatile float V, I, P, Bar, Bar_pozzo;
 static volatile uint16_t in1; /*prima parte dei 16 input, quelli da 0 a 15 : registro 65 sul plc master*/
 static volatile uint16_t in2; /*prima parte dei 16 input, quelli da 16 a 23 : registro 66 sul plc master*/
 static volatile uint16_t in3; /*8 ingressi digitali sul modulo di espansione del PLC*/
 static volatile uint16_t otb_din; /* ingressi digitali dell'OTB */
+static volatile uint16_t plc_dout; /*  OUT digitali del PLC */
+static volatile uint16_t otb_dout; /*  OUT digitali dell'OTB */
 static volatile uint64_t inlong=0; /* contiene fino a 64 ingressi digitali concatenazione di in1 in2, in3 e otb_din */
 
 static JsonNode *node=NULL /* contiene TUTTO il JSON */;
 static JsonNode *SoBs=NULL; /* la parte JSON per Spie o Bobine */
-// static JsonNode *SoB=NULL; /* La singola spia o bobina all'interno di SoBs */
 static JsonNode *Energia=NULL;
 static JsonNode *E=NULL; // generico elemento
 static char *gh; /* stringa che contiene il file di configuarazione JSON di spie, bobine e energia (VIP,BAR,BAR pozzo) */
 static char *gh_current; /*stringa generata dinamicamente che contiene i valori aggiornati da inviare al client */
-
-char *inputs_names[]={ 
-  "AUTOCLAVE", // 0
-  "POMPA_SOMMERSA", // 1
-  "RIEMPIMENTO", // 2
-  "LUCI_ESTERNE_SOTTO", // 3
-  "CENTR_R8", // 4
-  "LUCI_GARAGE_DA_4", // 5
-  "LUCI_GARAGE_DA_2", // 6
-  "LUCI_TAVERNA_1_di_2", // 7
-  "LUCI_TAVERNA_2_di_2", // 8
-  "INTERNET",            // 9
-  "C9912",              // 10
-  "LUCI_CUN_LUN",       // 11
-  "LUCI_CUN_COR",       // 12
-  "LUCI_STUDIO_SOTTO",  // 13
-  "LUCI_ANDRONE_SCALE", // 14
-  "GENERALE_AUTOCLAVE", // 15
-  "LUCI_CANTINETTA",    // 16 
-  "PLC_INPUT_17", // 17
-  "PLC_INPUT_18", // 18
-  "PLC_INPUT_19", // 19
-  "PLC_INPUT_20", // 20
-  "PLC_INPUT_21", // 21
-  "PLC_INPUT_22", // 22
-  "PLC_TM2_INPUT_0",  // 23
-  "PLC_TM2_INPUT_1",  // 24
-  "PLC_TM2_INPUT_2",  // 25
-  "PLC_TM2_INPUT_3",  // 26
-  "PLC_TM2_INPUT_4",  // 27
-  "PLC_TM2_INPUT_5",  // 28
-  "PLC_TM2_INPUT_6",  // 29
-  "PLC_TM2_INPUT_7",  // 30
-  "PLC_TM2_INPUT_8",  // 31
-  "PLC_TM2_INPUT_9",  // 32
-  "PLC_TM2_INPUT_10", // 33
-  "PLC_TM2_INPUT_11", // 34
-  "PLC_TM2_INPUT_12", // 35
-  "PLC_TM2_INPUT_13", // 36
-  "PLC_TM2_INPUT_14", // 37
-  "PLC_TM2_INPUT_15", // 38
-  "OTB_DIN_0", // 39
-  "OTB_DIN_1", // 40
-  "OTB_DIN_2", // 41
-  "OTB_DIN_3", // 42
-  "OTB_DIN_4", // 43
-  "OTB_DIN_5", // 44
-  "OTB_DIN_6", // 45
-  "OTB_DIN_7", // 46
-  "OTB_DIN_8", // 47
-  "OTB_DIN_9", // 48
-  "OTB_DIN_10",// 49
-  "FARETTI_ESTERNI",// 50  (OTB)
-  "IN_51",  // 51
-  "IN_52",  // 52
-  "IN_53",  // 53
-  "IN_54",  // 54
-  "IN_55",  // 55
-  "IN_56",  // 56
-  "IN_57",  // 57
-  "IN_58",  // 58
-  "IN_59",  // 59
-  "IN_60",  // 60
-  "IN_61",  // 61
-  "IN_62",  // 62
-  "IN_63"   // 63
-
-};
 
 /* current token*/
 char * tok;
@@ -158,22 +85,61 @@ uint16_t invert_state(uint16_t reg, uint16_t q) {
 	return reg ^ (1 << q);
 }
 
-int pulsante(modbus_t *m, int bobina) {
+/*==============================ATTIVAZIONI===========================================================*/
 
-	if (modbus_write_bit(m, bobina, TRUE) != 1) {
-		printf("ERRORE DI SCRITTURA:PULSANTE ON");
-		return -1;
-	}
-	sleep(1);
+uint16_t attiva(modbus_t *m, char *t, double registro, double bit) {
+  
+  /* per la conversione double-->int vedi:  http://c-faq.com/fp/round.html C FAQ num 14.6*/
+  int b=(int)(bit+0.5);
 
-	if (modbus_write_bit(m, bobina, FALSE) != 1) {
-		printf("ERRORE DI SCRITTURA:PULSANTE OFF");
-		return -1;
-	}
-	return 0;
+  /* servono per leggere lo stato del bit remoto */
+  uint8_t *bits=NULL;
+  bits=(uint8_t *)malloc(nbits*sizeof(uint8_t));
+  memset(bits, 0, nbits * sizeof(uint8_t));
+  /***********************************************/
+
+  // int r=(int)(registro +0.5);
+
+
+  ///////////////////////////////////////////////////////
+  // Si richiede di aggiornare una Bobina come Pulsante
+  if ( (registro<0) && (strncmp(t,"P",(size_t)1)!=0)) { 
+    printf("attivo la bobina %i di tipo %s\n",b,t); 
+    // la metto a ON
+    if (modbus_write_bit(m, b, TRUE) != 1) {
+      printf("ERRORE DI SCRITTURA:PULSANTE ON\n");
+      return -1;
+    }
+    sleep(1);
+    // la metto a OFF
+    if (modbus_write_bit(m, b, FALSE) != 1) {
+      printf("ERRORE DI SCRITTURA:PULSANTE OFF\n");
+      return -1;
+    }
+    return 1;
+  }
+  //////////////////////////////////////////////////////////
+
+
+
+  /////////////////////////////////////////////////////////
+  // Si richiede di aggiornare una Bobina come Interruttore
+  if ( (registro<0) && (strncmp(t,"I",(size_t)1)!=0)) { 
+    // leggo i bit remoto il cui valore si trova in bits[0]
+    modbus_read_bits(mb, b, 1, bits);
+    if (bits[0]==ON) { modbus_write_bit(m, b, FALSE) } else {modbus_write_bit(m, b, TRUE)}
+    return 1;
+  }
+  //////////////////////////////////////////////////////////
+
+
+
+
+
+  return 1;
 }
-
-
+    	
+      
 
 
 /*==============================READ JSON FILE===========================================================*/
@@ -197,7 +163,7 @@ char * readconfig(char *file) {
 	  //fwrite(buffer, s, 1, stdout);
  
 	  //free(buffer);
-	}
+	} else { printf("buffer non allocato\n"); return (char *)NULL;}
       if (fh != NULL) fclose(fh);
     }
   return buffer;
@@ -231,7 +197,7 @@ static int callback_energy(struct libwebsocket_context * this,
 	modbus_t *mbw;
 	JsonNode *Elem,*S;
 	
-	char PLC_IP[] = "192.168.1.157";
+	// char PLC_IP[] = "192.168.1.157";
 	//	char OTB_IP[] = "192.168.1.11";
 
 	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+4096+LWS_SEND_BUFFER_POST_PADDING];
@@ -247,28 +213,43 @@ static int callback_energy(struct libwebsocket_context * this,
 	case LWS_CALLBACK_RECEIVE:// il browser ha fatto una websocket.send e il valore è nella variabile *in*
 	  S=json_find_member(node,"SoBs");
 	  Elem=json_find_member(S,(char *)in);
-
-	  //printf("%s\n",json_stringify(node,NULL));
-	  printf("-->>%s\n",(char *)in);
-	  if (Elem) {
-	    printf("IP=%s\nRele=%1.0lf\n",json_find_member(Elem,"ip")->string_,json_find_member(Elem,"rele")->number_);
-	  } else {printf("Ricevuto un comando non riconosciuto");}
+	  char *ip,*type;
+	  double bobina,reg;
 	  
-	  /* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */	  
-	  /* viene chiamata quando si clicca su una bobina*/
-	  mbw = modbus_new_tcp(PLC_IP, 502);
-	  if (modbus_connect(mbw) == -1) {
-	    fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
-	    modbus_free(mbw);
-	    return -1;
-	  }
-	  /* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
+	  if (Elem) {
+	    ip=json_find_member(Elem,"ip")->string_;
+	    type=json_find_member(Elem,"type")->string_;
+	    
+	    
+	    if (json_find_member(Elem,"rele")->tag==JSON_NUMBER) {
+	      reg=-1;
+	      bobina=json_find_member(Elem,"rele")->number_;
+	    } else { /* è un array: il primo valore è il registro, il secondo il bit del registro da accender/spegnere */
+	      reg=json_find_member(Elem,"rele")->children.head->number_;
+	      bobina=json_find_member(Elem,"rele")->children.tail->number_;
 
-	  fprintf(stderr, "bobina da accendere: %d\n", atoi((char *)in));
-	  //pulsante(mbw,atoi((char *)in));
-	  modbus_close(mbw);
-	  modbus_free(mbw);
-	  libwebsocket_callback_on_writable(this,wsi); // richiedi la disponibilità a scrivere
+	    }
+
+
+	    /* viene chiamata quando si clicca su una bobina*/
+	    mbw = modbus_new_tcp(ip, 502);
+	    if (modbus_connect(mbw) == -1) {
+	      fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
+	      modbus_free(mbw);
+	      return -1;
+	    }
+	    //pulsante(mbw,(int)json_find_member(Elem,"rele")->number_);
+	    attiva(mbw,type,reg,bobina);
+	    modbus_close(mbw);
+	    modbus_free(mbw);
+	    libwebsocket_callback_on_writable(this,wsi); // richiedi la disponibilità a scrivere  
+	  }
+	  else {
+	    printf("Ricevuto un comando non riconosciuto");
+	  }
+	  
+
+	  
 	  break;
 	  
 	case LWS_CALLBACK_SERVER_WRITEABLE: 
@@ -520,16 +501,19 @@ int main(void) {
   /* JSON STUFF */
   /*****************************************************/
   gh=readconfig("gh.json");
-  //  printf("%s\n",gh);  
+
+  // printf("%s\n",gh);  
   node=json_decode(gh);
+
   //free(gh);
   if (node == NULL) {
     printf("Failed to decode \n");
-    exit(1);
+    exit(EXIT_FAILURE);
+
   }
   SoBs=json_find_member(node,"SoBs");
   Energia=json_find_member(node,"Energia");
-  printf("---------------\n");  
+
   /*
 	json_foreach(En,Energia) 
 	{     
@@ -539,7 +523,7 @@ int main(void) {
 	}
   
   *****************************************************/
-    printf("---------------\n");  
+
   
   // infinite loop, to end this server send SIGTERM. (CTRL+C)
   
@@ -559,21 +543,14 @@ int main(void) {
       if (modbus_read_registers(mb, 65, 16, tab_reg) > 0) {
 	
 	
-	/* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
-	// VALORI DIGITALI (PLC + OTB). Questi valori sono usati nelle callback 
-	/* da eliminare dopo la modifica sulla callback */
-	io1=tab_reg[0];
-	io2=tab_reg[1];
-	OTBDIN=tab_reg[9]; // ingressi digitali OTB che il PLC ha passato al PC nella posizione 9 di tab_reg[].
-	/* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
-	
 	/*------------------- PLC IN--------------------------------------*/		  
 	in1=tab_reg[0]; /* 65 */
 	in2=tab_reg[1]; /* 66 */
 	in3=tab_reg[15]; /* Ingressi Modulo esterno del PLC TM2... (80) */
-	
+	plc_dout=tab_reg[2]; /* uscite del PLC */
 	/*------------------- OTB DIGITAL IN------------------------------*/
 	otb_din=tab_reg[9];
+	otb_dout=tab_reg[12];
 	inlong=0;
 	
 	inlong=place(inlong,in1,0);      // 0-15
@@ -600,16 +577,16 @@ int main(void) {
 	   
 	  }
 	}  
-	    json_find_member(Energia,"V")->number_=V;
-	    json_find_member(Energia,"I")->number_=I;
-	    json_find_member(Energia,"P")->number_=P;
-	    json_find_member(Energia,"BAR")->number_=Bar;
-	    json_find_member(Energia,"BAR_POZZO")->number_=Bar_pozzo;
-	    //	    printf("%s\n",json_stringify(Energia,"\t"));
+	json_find_member(Energia,"V")->number_=V;
+	json_find_member(Energia,"I")->number_=I;
+	json_find_member(Energia,"P")->number_=P;
+	json_find_member(Energia,"BAR")->number_=Bar;
+	json_find_member(Energia,"BAR_POZZO")->number_=Bar_pozzo;
+	//	    printf("%s\n",json_stringify(Energia,"\t"));
 	gh_current = json_stringify(node,NULL);
 	//	printf("%s\n",gh_current);
 	json_delete(E);
-
+	
       } else {
 	printf("ERR: modbus read registers riprovo a creare il context\n");
 	modbus_close(mb);
@@ -626,7 +603,7 @@ int main(void) {
     } // (ms - oldms) > 50) 
     n = libwebsocket_service(context, 50);
   }
-  	  
+  
   modbus_close (mb);
   modbus_free (mb);
   

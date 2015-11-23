@@ -2,19 +2,19 @@
 
 CC = gcc
 
-objs = json.o server.o
+objs = json.o server.o tmb.o
 
 INCDIR = /home/reario/include
 LIBDIR = /home/reario/lib
 
 
-all : server
+all : server tmc
 
 server :  json.o server.o
 	$(CC) -Wall -I${INCDIR} -I${INCDIR}/modbus -I${INCDIR}/liboath -L${LIBDIR} -lmodbus -lwebsockets -loath $^ -o $@
 
-conf : conf.o
-	$(CC) -Wall -I${INCDIR} -L${LIBDIR} -lconfig $^ -o $@
+tmb : tmb.o
+	$(CC) -Wall -I${INCDIR} -L${LIBDIR} -lmodbus $^ -o $@
 
 .c.o : json.h server.h
 	$(CC) -c -g -Wall -I$(INCDIR) -I${INCDIR}/modbus -I${INCDIR}/liboath $< -o $@

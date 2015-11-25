@@ -9,6 +9,10 @@
 #include "json.h"
 #include "server.h"
 
+/* la numerazione degli input si riferisce ai bit di inlong del programma */
+/* la numerazione degli out invece si riferisce a quella del dispositivo */
+
+
 static volatile float V, I, P, Bar, Bar_pozzo;
 static volatile uint16_t in1; /*prima parte dei 16 input, quelli da 0 a 15 : registro 65 sul plc master*/
 static volatile uint16_t in2; /*prima parte dei 16 input, quelli da 16 a 23 : registro 66 sul plc master*/
@@ -86,25 +90,33 @@ uint16_t invert_state(uint16_t reg, uint16_t q) {
 }
 
 /*==============================ATTIVAZIONI===========================================================*/
-
 uint16_t attiva(modbus_t *m, char *t, double registro, double bit) {
-  
+  // NOTA: le attivazioni non coinvolgono il PLC-PC da cui tutto questo programma acquisisce i dati
+  // Tutte le operazioni sono fatte usando gli IP dei dispositivi remoti
+
   /* per la conversione double-->int vedi:  http://c-faq.com/fp/round.html C FAQ num 14.6*/
   int b=(int)(bit+0.5);
+  int r=(int)(registro +0.5);
 
+  ///////////////////////////////////////////////////////
   /* servono per leggere lo stato del bit remoto */
   uint8_t *bits=NULL;
-  bits=(uint8_t *)malloc(nbits*sizeof(uint8_t));
-  memset(bits, 0, nbits * sizeof(uint8_t));
+  bits=(uint8_t *)malloc(1*sizeof(uint8_t));
+  memset(bits, 0, 1 * sizeof(uint8_t));
   /***********************************************/
-
-  // int r=(int)(registro +0.5);
 
 
   ///////////////////////////////////////////////////////
+  /* serve per leggere il registrot remoto */
+  uint16_t regs[1];
+  /***********************************************/
+
+
+  //////////////// BOBINE ///////////////////////////////
+  ///////////////////////////////////////////////////////
   // Si richiede di aggiornare una Bobina come Pulsante
-  if ( (registro<0) && (strncmp(t,"P",(size_t)1)!=0)) { 
-    printf("attivo la bobina %i di tipo %s\n",b,t); 
+  if ( (registro<0) && (strncmp(t,"P",(size_t)1)==0)) { 
+    printf("attivo la bobina %i come pulsante (%s)\n",b,t); 
     // la metto a ON
     if (modbus_write_bit(m, b, TRUE) != 1) {
       printf("ERRORE DI SCRITTURA:PULSANTE ON\n");
@@ -116,27 +128,110 @@ uint16_t attiva(modbus_t *m, char *t, double registro, double bit) {
       printf("ERRORE DI SCRITTURA:PULSANTE OFF\n");
       return -1;
     }
-    return 1;
+    return 1; // finito pulsante per una bobina
   }
   //////////////////////////////////////////////////////////
-
-
 
   /////////////////////////////////////////////////////////
   // Si richiede di aggiornare una Bobina come Interruttore
-  if ( (registro<0) && (strncmp(t,"I",(size_t)1)!=0)) { 
+  if ( (registro<0) && (strncmp(t,"I",(size_t)1)==0)) { 
+   
     // leggo i bit remoto il cui valore si trova in bits[0]
-    modbus_read_bits(mb, b, 1, bits);
-    if (bits[0]==ON) { modbus_write_bit(m, b, FALSE) } else {modbus_write_bit(m, b, TRUE)}
-    return 1;
-  }
+    printf("attivo la bobina %i come interruttore (%s)\n",b,t);
+    if (modbus_read_bits(m, b, 1, bits) >0 ) {
+      bits[0]^=1<<0; // bits[0] è il byte che contiene true o false (0000001 o 000000000)
+      if (modbus_write_bit(m,b,bits[0]) > 0) {
+	return 1;
+      } else { return -1; }
+      
+    } else { return -1; }
+
+    return 1; // finito interruttore per un bobina
+  }  
   //////////////////////////////////////////////////////////
 
 
+  //////////////// BOBINE NEL REGISTRO ///////////////////////////////
+  ///////////////////////////////////////////////////////
+  // Si richiede di aggiornare una Bobina nel registro come Pulsante
+  if ( (registro>=0) && (strncmp(t,"P",(size_t)1)==0)) 
+    {
+      // leggo il registro
+      printf("1.1 Leggo il registro\n");
+      if (modbus_read_registers(m,r,1,regs)>0) 
+	{
+	  printf("2.1 Metto ad on il suo bit\n");
+	  // Metto a ON
+	  //if ( (regs[0] & (1<<b)) == 0) // non è a zero
+	  regs[0]|=(1<<b); 
+	  // Lo riscrivo. Per compattezza controllo se è andato male
+	  printf("3.1 Riscrivo il registro\n");
+	  if (modbus_write_register(m,r,regs[0])<0) 
+	    {
+	      printf("ERRORE DI SCRITTURA DEL REGISTRO NELLA FASE ON: PULSANTE\n");
+	      return -1;
+	    }
+	  
+	} // read register
+      else 
+      { 
+	printf("ERRORE DI LETTURA DEL REGISTRO NELLA FASE ON: PULSANTE\n");
+	return -1;
+      }
+    // pausa di 1 secondo
+    printf("---- Pausa...1 sec ----\n");
+    sleep(1);
+    // ripeto come sopra ma mettendo a OFF il bit del registro
+    printf("2.1 Leggo il registro\n");
+    if (modbus_read_registers(m,r,1,regs)>0) 
+      {
+	printf("2.2 Metto ad off il suo bit\n");
+	// Metto a OFF
+	regs[0]&=~(1<<b);
+	// Lo riscrivo. Per compattezza controllo se è andato male
+	printf("3.2 Riscrivo il registro\n");
+	if (modbus_write_register(m,r,regs[0])<0) 
+	  {
+	    printf("ERRORE DI SCRITTURA DEL REGISTRO NELLA FASE OFF: PULSANTE\n");
+	    return -1;
+	  } 
+      }
+    else 
+      {
+	printf("ERRORE DI LETTURA DEL REGISTRO NELLA FASE OFF: PULSANTE\n");
+	return -1;
+      }
+    return 1; // finito pulsante per il bit di un registro
+    }
+
+  ///////////////////////////////////////////////////////
+  // Si richiede di aggiornare una Bobina nel registro come INTERRUTTORE
+  if ( (registro>=0) && (strncmp(t,"I",(size_t)1)==0)) { 
+   
+    // leggo i registrot remoto il cui valore si trova in regs[0]
+    printf("cambio lo stato della bobina nel registro \n");
+    if (modbus_read_registers(m, r, 1, regs) >0 ) {
+      regs[0]^=1<<b; // regs[0] è il byte che contiene true o false (0000001 o 000000000)
+      if (modbus_write_register(m,r,regs[0]) > 0) {
+	return 1;
+      } else { return -1; }
+      
+    } else { return -1; }
+
+    return 1; // finito interruttore per un bobina
+  }  
 
 
 
-  return 1;
+
+
+
+
+
+
+
+
+  return 0; // you should never be here!!!
 }
     	
       
@@ -152,7 +247,7 @@ char * readconfig(char *file) {
       fseek(fh, 0L, SEEK_END);
       long s = ftell(fh);
       rewind(fh);
-      buffer = malloc(s);
+      buffer = malloc(s+1);
       if ( buffer != NULL )
 	{
 	  fread(buffer, s, 1, fh);
@@ -227,9 +322,8 @@ static int callback_energy(struct libwebsocket_context * this,
 	    } else { /* è un array: il primo valore è il registro, il secondo il bit del registro da accender/spegnere */
 	      reg=json_find_member(Elem,"rele")->children.head->number_;
 	      bobina=json_find_member(Elem,"rele")->children.tail->number_;
-
+	      
 	    }
-
 
 	    /* viene chiamata quando si clicca su una bobina*/
 	    mbw = modbus_new_tcp(ip, 502);
@@ -239,6 +333,7 @@ static int callback_energy(struct libwebsocket_context * this,
 	      return -1;
 	    }
 	    //pulsante(mbw,(int)json_find_member(Elem,"rele")->number_);
+	    printf("registro=%lf - bobina=%lf\n",reg,bobina);
 	    attiva(mbw,type,reg,bobina);
 	    modbus_close(mbw);
 	    modbus_free(mbw);
@@ -502,7 +597,7 @@ int main(void) {
   /*****************************************************/
   gh=readconfig("gh.json");
 
-  // printf("%s\n",gh);  
+  printf("%s\n",gh);  
   node=json_decode(gh);
 
   //free(gh);

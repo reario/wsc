@@ -6,7 +6,7 @@
     "BAR": 0,
     "BAR_POZZO": 0
   },
-  "SoBs": {
+  "SoBs": { 
     "AUTOCLAVE": {
       "id": "Autoclave",
       "ip": "192.168.1.157",

@@ -1,11 +1,6 @@
-//#include <stdio.h>
-//#include <string.h>
-//#include <stdlib.h>
 #include <errno.h>
 #include <libwebsockets.h>
 #include <math.h>
-
-//#include <modbus.h>
 #include <oath.h>
 #include "json.h"
 #include "server.h"
@@ -21,63 +16,6 @@ static char *gh_current; /*stringa generata dinamicamente che contiene i valori 
 
 /* current token*/
 char * tok;
-
-void printbitssimple64(uint64_t n) {
-  /*dato l'intero n stampa la rappresentazione binaria*/
-  uint64_t i;
-  int j;
-  i = (uint64_t)1<<(sizeof(n) * 8 - 1); /* 2^n */
-  for (j=63;j>=0;j--) {   
-    printf(" %2i",j);
-  }
-  printf("\n");  
-
-  while (i > 0) {
-    if (n & i)
-      printf(" %2i",1);
-    else
-      printf(" %2i",0);
-    i >>= 1;
-  }
-  printf("\n");
-}
-
-uint16_t read_single_state64(uint64_t reg, uint16_t q) {
-	/*legge q-esomo bit di reg*/
-  if (q < (uint16_t)64) {
-    uint64_t i=0;
-    
-    i = ((uint64_t)1 << q); /* 2^q */
-    //printf("i=%u\n",i);
-    if (reg & i) {
-      return (uint16_t)1;
-    } else {
-      return (uint16_t)0;
-    };
-  } else {
-    return -1;
-  }
-}
-
-uint16_t read_single_state(uint16_t reg, uint16_t q) {
-  /*legge q-esomo bit di reg*/
-  if (q < 16) {
-    uint16_t i;
-    i = (1 << q); /* 2^q */
-    if (reg & i) {
-      return 1;
-    } else {
-      return 0;
-    };
-  } else {
-    return -1;
-  }
-}
-
-uint16_t invert_state(uint16_t reg, uint16_t q) {
-  /*inverte il q-esimo bit*/
-  return reg ^ (1 << q);
-}
 
 
 /*==============================READ JSON FILE===========================================================*/
@@ -364,18 +302,6 @@ static struct libwebsocket_protocols protocols[] = {
 /*==========================================================================*/
 
 
-uint64_t place (uint64_t dest, uint16_t source, uint16_t pos) {
-
-  /* places the string of bit represented by source in position pos (starting from left) into dest */
- 
-  uint64_t temp=0;
-
-  temp=temp|source;
-  temp=temp<<pos;
-  dest=dest|temp;
-  return dest;
-
-}
 
 
 /*============================MAIN==============================================*/
@@ -485,10 +411,10 @@ int main(void) {
 	otb_dout=tab_reg[12];
 	inlong=0;
 	
-	inlong=place(inlong,in1,0);      // 0-15
-	inlong=place(inlong,in2,16);     // 16-22
-	inlong=place(inlong,in3,23);     // 23-38
-	inlong=place(inlong,otb_din,39); // 39-50
+	inlong=place64(inlong,in1,0);      // 0-15
+	inlong=place64(inlong,in2,16);     // 16-22
+	inlong=place64(inlong,in3,23);     // 23-38
+	inlong=place64(inlong,otb_din,39); // 39-50
 	/* adesso in inlong ho lo stato di tutti gli input nelle posizioni sopra indicate */
 	
 	// VALORI ANALOGICI (PM9 + OTB)
@@ -498,12 +424,16 @@ int main(void) {
 	Bar=(float)(tab_reg[10]*0.002442); // INPUT ANALOGICO OTB
 	Bar_pozzo=(float)(tab_reg[11]*0.002442); // INPUT ANALOGICO OTB
 	//printf("-----------------\n");
-	uint16_t input=1000;
+	uint16_t input;
 
 	json_foreach(E,SoBs) {
 	  if (E) {
 	    input=json_find_member(E,"input")->number_;
-	    if (input>=0 && input!=1000) { /* è una spia e/o una bobina */
+	    if (input>=0 && input!=1000) { /* 
+					      è una spia e/o una bobina. 1000 è un upperbound arbitrario,
+					      che rappresenta il num massimo che può assumere un input
+					   */
+	      //number_ è un duble e non posso assegnargli quello che ritorna read_single_state64
 	      json_find_member(E,"stato")->number_=read_single_state64(inlong,input)==1?1:0;
 	    }
 	    

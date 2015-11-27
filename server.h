@@ -14,8 +14,12 @@ static volatile uint16_t plc_dout; /*  OUT digitali del PLC */
 static volatile uint16_t otb_dout; /*  OUT digitali dell'OTB */
 static volatile uint64_t inlong=0; /* contiene fino a 64 ingressi digitali concatenazione di in1 in2, in3 e otb_din */
 
-
-
+/* bitwise operations */
+void printbitssimple64(uint64_t n);
+uint16_t read_single_state64(uint64_t reg, uint16_t q);
+void printbitssimple(uint16_t n);
+uint16_t read_single_state(uint16_t reg, uint16_t q);
+uint64_t place64(uint64_t dest, uint16_t source, uint16_t pos);
 
 uint16_t attiva(modbus_t *m, char *t, double registro, double bit);
 

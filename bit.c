@@ -1,4 +1,3 @@
-
 #include "server.h"
 
 void printbitssimple64(uint64_t n) {

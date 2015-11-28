@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <libwebsockets.h>
 #include <math.h>
-#include <oath.h>
+
 #include "json.h"
 #include "server.h"
 
@@ -14,9 +14,12 @@ static JsonNode *E=NULL; // generico elemento
 static char *gh;
 static char *gh_current; /*stringa generata dinamicamente che contiene i valori aggiornati da inviare al client */
 
+//#define CHECK
+#ifdef CHECK
+#include <oath.h>
 /* current token*/
 char * tok;
-
+#endif
 
 /*==============================READ JSON FILE===========================================================*/
 char * readconfig(char *file) {
@@ -197,6 +200,7 @@ static int callback_spie_bobine(
 	return 0;
 }
 
+#ifdef CHECK
 static int callback_totp(struct libwebsocket_context * this,
 		struct libwebsocket *wsi,
 		enum libwebsocket_callback_reasons reason,
@@ -224,8 +228,8 @@ static int callback_totp(struct libwebsocket_context * this,
 			lwsl_err("ERROR %d writing to di socket totp (returned %d)\n", n,m);
 			return -1;
 		}
-#define CHECK
-#ifdef CHECK
+
+
 		/*
 		 Qui le routine per il controllo della validità del token
 		 */
@@ -247,7 +251,7 @@ static int callback_totp(struct libwebsocket_context * this,
 		);
 		printf("-->%d\n",valid);
 		if (valid==OATH_INVALID_OTP) {printf("INVALID\n");} else {printf("VALID\n");}
-#endif
+
 		fprintf(stderr,"ti ho rimandato questo token: %s\n",tok);
 		break;
 
@@ -267,7 +271,7 @@ static int callback_totp(struct libwebsocket_context * this,
 
 	return 0;
 }
-
+#endif // check
 /*============================END CALBACKs======================================*/
 
 /*============================PROTOCOLS=========================================*/
@@ -275,8 +279,10 @@ enum protocols {
 	/* always first */
 	PROTOCOL_HTTP = 0,
 
-	PROTOCOL_ENERGY, PROTOCOL_SPIE_BOBINE, PROTOCOL_TOTP,
-
+	PROTOCOL_ENERGY, PROTOCOL_SPIE_BOBINE, 
+	#ifdef CHECK
+	PROTOCOL_TOTP,
+	#endif
 	/* always last */
 	DEMO_PROTOCOL_COUNT
 };
@@ -292,11 +298,13 @@ static struct libwebsocket_protocols protocols[] = {
 		}, { "spie_bobine", // protocol name - very important!
 				callback_spie_bobine,   // callback
 				0                  // we don't use any per session data
-		}, { "totp", // protocol name - very important!
+},
+#ifdef CHECK
+		 { "totp", // protocol name - very important!
 				callback_totp,   // callback
 				0                  // we don't use any per session data
 		},
-
+#endif
 		{ NULL, NULL, 0 /* End of list */
 		} };
 /*==========================================================================*/
@@ -311,7 +319,7 @@ int main(void) {
   uint16_t tab_reg[17]; // max 15 reg. in realtà ne servono 16
   // uint16_t x; // usata per loop dentro la variabile inlong di 64 bit  
   
-  mb = modbus_new_tcp("127.0.0.1", 502);
+  mb = modbus_new_tcp("192.168.1.103", 502);
   
   if (modbus_connect(mb) == -1) {
     fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));

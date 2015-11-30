@@ -361,6 +361,8 @@ int main(void) {
   
   printf("starting server...\n");
   version();
+
+
   // 
   
   /*****************************************************/
@@ -389,10 +391,18 @@ int main(void) {
 	}
   
   *****************************************************/
+  
+  
 
-  
-  // infinite loop, to end this server send SIGTERM. (CTRL+C)
-  
+  /*
+  if (lws_daemonize("/tmp/.lwsts-lock")) {
+    fprintf(stderr, "Failed to daemonize\n");
+    return 1;
+  }
+  */
+
+// infinite loop, to end this server send SIGTERM. (CTRL+C)
+
   while (n >= 0) {
     struct timeval tv;
     gettimeofday(&tv, NULL);

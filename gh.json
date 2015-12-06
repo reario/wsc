@@ -169,6 +169,15 @@
       "funzione": "spia_bobina",
       "stato": 0
     },
+    "FARETTI_ESTERNI_SOTTO": {
+      "id": "Faretti esterni sotto",
+      "ip": "192.168.1.11",
+      "type": "I",
+      "rele": [100, 1],
+      "input": 49,
+      "funzione": "spia_bobina",
+      "stato": 0
+    },
     "SERRATURA_PORTONE": {
       "id": "Serratura Portone",
       "ip": "192.168.1.157",

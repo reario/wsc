@@ -69,7 +69,7 @@ static int callback_energy(struct libwebsocket_context * this,
 	int n,m;
 	modbus_t *mbw;
 	JsonNode *Elem,*S;
-	
+
 	// char PLC_IP[] = "192.168.1.157";
 	//	char OTB_IP[] = "192.168.1.11";
 
@@ -176,15 +176,14 @@ static int callback_spie_bobine(
 	  break;
 	  
 	case LWS_CALLBACK_SERVER_WRITEABLE:// se c'è un socket aperto e questo è disponibile, invio la lista delle spie e bobine
-	  /* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
-	  //n = sprintf((char *)p,spie_bobine);
-	  /* 8<------8<------8<------8<------8<------8<------8<------8<------8<------8< */
+	  
 	  n = sprintf((char *)p,gh_current); /* invio il json letto dal file statico per dire al client la conformazione di tutto */	  
 	  
 	  m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
 	  fprintf(stderr,"constants spie and bobine sent\n");
 	  	  if (m < n) {
-	    //	    [1448056884:7846] ERR: ERROR 4471 writing to di socket spie_bobine (returned 4376)
+	    // buffer troppo grande da mandare intero. Viene restituito un errore di questo tipo:
+	    // [1448056884:7846] ERR: ERROR 4471 writing to di socket spie_bobine (returned 4376)
 	    lwsl_err("ERROR %d writing to socket spie_bobine (returned %d)\n", n,m);
 	    return -1;
 	    }

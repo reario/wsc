@@ -1,6 +1,6 @@
 .SUFFIXES: .c.o
 
-CC = gcc
+CC = gcc 
 
 objs = json.o attiva.o server.o bit.o
 
@@ -17,7 +17,7 @@ server :  json.o server.o bit.o attiva.o
 
 
 .c.o : json.h server.h
-	$(CC) -c -g -Wall -DCHECK -I$(INCDIR) -I${INCDIR}/modbus -I${INCDIR}/liboath $< -o $@
+	$(CC) -c -g -Wall -Werror=maybe-uninitialized -DCHECK -I$(INCDIR) -I${INCDIR}/modbus -I${INCDIR}/liboath $< -o $@
 
 clean :
 	rm -f *~ *.o *.i *.s *.core server

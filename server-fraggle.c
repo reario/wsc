@@ -92,10 +92,11 @@ callback_fraggle(struct libwebsocket_context *context,
 		switch (psf->state) {
 
 		case START:
-		  
-		  
+		  		  
 		  psf->NBlocchi = (StringL / BUFFER) + 1;		  
-		  psf->sfido = StringL % BUFFER;		 
+		  psf->sfido = StringL % BUFFER;
+		  psf->BloccoCorrente=1;
+		  /* fallthru */
 
 		case CONTINUE:		  
 		  /*
@@ -104,16 +105,52 @@ callback_fraggle(struct libwebsocket_context *context,
 		    write_mode = LWS_WRITE_CONTINUATION | LWS_WRITE_NO_FIN; // all middle fragments
 		    write_mode = LWS_WRITE_CONTINUATION; // last fragment
 		  */
+
+
+	 
+		  if (psf->NBlocchi==1) {
+		    /* ho solo lo sfrido da inviare */
+		    write_mode = LWS_WRITE_TEXT;
+		    /* controllo se c'è lo sfrido */
+		    if (psf->sfido>0) {
+		      /* invio */
+		    }
+ 		  } 
+		    
+		  if ((psf->NBlocchi>1) && (psf->BloccoCorrente=1)) {
+		    /* sono sul primo blocco */
+		    write_mode = LWS_WRITE_BINARY | LWS_WRITE_NO_FIN;
+		    psf->state=CONTINUE;
+		    psf->BloccoCorrente++;
+		    /* invio */
+		  }
 		  
-		  if (psf->NBlocchi==0) {
-		    // devo inviare solo lo sfrido
-		    psf->state = FINAL;  
-		  } else {
+		  if ( (psf->NBlocchi>1) && (psf->BloccoCorrente < psf->NBlocchi) ) {
+		    /* sono nei blocchi intermedi */
+		    write_mode = LWS_WRITE_CONTINUATION | LWS_WRITE_NO_FIN;
+		    psf->state=CONTINUE;
+		    psf->BloccoCorrente++;
+		    /*invio*/
+		  }
+
+		  if ( (psf->NBlocchi>1) && (psf->BloccoCorrente == psf->NBlocchi) ) {
+		    /* sono nell'ultimo blocco: lo sfrido */
+		    write_mode = LWS_WRITE_CONTINUATION;
+		    /* controllo se c'è lo sfrido perchè potrei avere un numero intero di blocchi*/
+                    if (psf->sfido>0) {
+                      /* invio */
+                    }
+
+		    
+		  }
+		  
+		  
+		     
 		    // Devo inviare almeno un blocco + lo sfrido
 		    psf->state = CONTINUE;
 		    psf->BloccoCorrente=1;		  
 		  }
-		  /* fallthru */
+		  
 
 
      		  

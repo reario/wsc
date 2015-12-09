@@ -24,7 +24,7 @@ char * tok;
 /*==============================READ JSON FILE===========================================================*/
 char * readconfig(char *file) {
 
-  char *buffer;
+  char *buffer=NULL;
   FILE *fh = fopen(file, "rb");
   if ( fh != NULL )
     {

@@ -25,9 +25,45 @@
 #include <string.h>
 #include <libwebsockets.h>
 
+#define BUFFER 1024
+
+static int client;
+static int terminate;
+
+
+int StringL;
+char *json;	
+
+/*==============================READ JSON FILE===========================================================*/
+char * readconfig(char *file) {
+
+  char *buffer=NULL;
+  FILE *fh = fopen(file, "rb");
+  if ( fh != NULL )
+    {
+      fseek(fh, 0L, SEEK_END);
+      long s = ftell(fh);
+      rewind(fh);
+      buffer = malloc(s+1);
+      if ( buffer != NULL )
+        {
+          fread(buffer, s, 1, fh);
+          // we can now close the file
+          fclose(fh); fh = NULL;
+
+          // do something, e.g.
+          //fwrite(buffer, s, 1, stdout);
+
+          //free(buffer);
+        } else { printf("buffer non allocato\n"); return (char *)NULL;}
+      if (fh != NULL) fclose(fh);
+    }
+  return buffer;
+}
+
+
 enum demo_protocols {
 	PROTOCOL_FRAGGLE,
-
 	/* always last */
 	DEMO_PROTOCOL_COUNT
 };
@@ -35,195 +71,187 @@ enum demo_protocols {
 /* fraggle protocol */
 
 enum fraggle_states {
-  START,
-  CONTINUE
+	FRAGSTATE_START_MESSAGE,
+	FRAGSTATE_RANDOM_PAYLOAD,
+	FRAGSTATE_POST_PAYLOAD_SUM,
 };
 
 struct per_session_data__fraggle {
-  uint16_t NBlocchi;
-  uint16_t BloccoCorrente;
-  uint16_t sfrido;
+  int packets_left;
+  int total_message;
+  int leftover;
+  unsigned long sum;
+  
+  char *pl;
   enum fraggle_states state;
 };
-
-uint16_t BUFFER=1024;
-
-uint16_t StringL=(BUFFER*16)*sizeof(char);
-char *payload=NULL;
-payload=(char *)malloc(StringL);
-memset(payload,'V', StringL);
 
 static int
 callback_fraggle(struct libwebsocket_context *context,
 			struct libwebsocket *wsi,
 			enum libwebsocket_callback_reasons reason,
-					       void *user, void *in, size_t len)
+			void *user, 
+			void *in, 
+			size_t len)
 {
-	int n;
-	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 8000 +
-						  LWS_SEND_BUFFER_POST_PADDING];
+	int n=0;
+	int tosent;
+	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 8000 +  LWS_SEND_BUFFER_POST_PADDING];
 	struct per_session_data__fraggle *psf = user;
-
+	//int chunk;
 	int write_mode = LWS_WRITE_CONTINUATION;
-
+	unsigned long sum;
 	unsigned char *p = (unsigned char *)in;
 	unsigned char *bp = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 
+#ifdef MODE
+	printf("LWS_WRITE_BINARY = %i\n\
+LWS_WRITE_BINARY|LWS_WRITE_NO_FIN = %i\n\
+LWS_WRITE_CONTINUATION|LWS_WRITE_NO_FIN = %i\n\
+LWS_WRITE_CONTINUATION = %i\n -----------------------------\n",
+LWS_WRITE_BINARY,
+LWS_WRITE_BINARY|LWS_WRITE_NO_FIN,
+LWS_WRITE_CONTINUATION|LWS_WRITE_NO_FIN,
+LWS_WRITE_CONTINUATION);
+#endif
+	
 	switch (reason) {
 
-	  /*	case LWS_CALLBACK_ESTABLISHED:
+	case LWS_CALLBACK_ESTABLISHED:
 
 		fprintf(stderr, "server sees client connect\n");
 		psf->state = FRAGSTATE_START_MESSAGE;
-
+		/* start the ball rolling */
 		libwebsocket_callback_on_writable(context, wsi);
+
 		break;
-		*/
+
 	case LWS_CALLBACK_CLIENT_ESTABLISHED:
 
 		fprintf(stderr, "client connects to server\n");
-		psf->state = START;
-		/* start the ball rolling */
-		libwebsocket_callback_on_writable(context, wsi);
+		psf->state = FRAGSTATE_START_MESSAGE;
 		break;
 
-	case LWS_CALLBACK_SERVER_WRITEABLE:
+	case LWS_CALLBACK_CLIENT_RECEIVE:
 
 		switch (psf->state) {
 
-		case START:
-		  		  
-		  psf->NBlocchi = (StringL / BUFFER) + 1;		  
-		  psf->sfido = StringL % BUFFER;
-		  psf->BloccoCorrente=1;
-		  /* fallthru */
+		case FRAGSTATE_START_MESSAGE:
+			psf->state = FRAGSTATE_RANDOM_PAYLOAD;
+			psf->sum = 0;
+			psf->total_message = 0;
+			psf->packets_left = 0;
 
-		case CONTINUE:		  
-		  /*
-		    write_mode = LWS_WRITE_BINARY; // single frame, no fragmentation
-		    write_mode = LWS_WRITE_BINARY | LWS_WRITE_NO_FIN; // first fragment
-		    write_mode = LWS_WRITE_CONTINUATION | LWS_WRITE_NO_FIN; // all middle fragments
-		    write_mode = LWS_WRITE_CONTINUATION; // last fragment
-		  */
+			/* fallthru */
+		case FRAGSTATE_RANDOM_PAYLOAD:		
 
-
-	 
-		  if (psf->NBlocchi==1) {
-		    /* ho solo lo sfrido da inviare */
-		    write_mode = LWS_WRITE_TEXT;
-		    /* controllo se c'è lo sfrido */
-		    if (psf->sfido>0) {
-		      /* invio */
-		    }
- 		  } 
-		    
-		  if ((psf->NBlocchi>1) && (psf->BloccoCorrente=1)) {
-		    /* sono sul primo blocco */
-		    write_mode = LWS_WRITE_BINARY | LWS_WRITE_NO_FIN;
-		    psf->state=CONTINUE;
-		    psf->BloccoCorrente++;
-		    /* invio */
+		  psf->sum +=  len;
+		  printf("\n");
+		  psf->total_message += len;
+		  psf->packets_left++;
+		  fprintf(stderr, "Fragment: %i bytes (total till now: %li)\n %s ", len,psf->sum,p);
+		  if (libwebsocket_is_final_fragment(wsi)) {
+		    psf->state = FRAGSTATE_POST_PAYLOAD_SUM;		    
 		  }
+		  printf ("write_mode (case BETWEEN)=%i\n",write_mode);
+		  break;
 		  
-		  if ( (psf->NBlocchi>1) && (psf->BloccoCorrente < psf->NBlocchi) ) {
-		    /* sono nei blocchi intermedi */
-		    write_mode = LWS_WRITE_CONTINUATION | LWS_WRITE_NO_FIN;
-		    psf->state=CONTINUE;
-		    psf->BloccoCorrente++;
-		    /*invio*/
-		  }
-
-		  if ( (psf->NBlocchi>1) && (psf->BloccoCorrente == psf->NBlocchi) ) {
-		    /* sono nell'ultimo blocco: lo sfrido */
-		    write_mode = LWS_WRITE_CONTINUATION;
-		    /* controllo se c'è lo sfrido perchè potrei avere un numero intero di blocchi*/
-                    if (psf->sfido>0) {
-                      /* invio */
-                    }
-
+		case FRAGSTATE_POST_PAYLOAD_SUM:
+		  
+		  sum = ((unsigned int)p[0]) << 24;
+		  sum |= p[1] << 16;
+		  sum |= p[2] << 8;
+		  sum |= p[3];
+		  if (sum == psf->sum) {
+		    fprintf(stderr, "EOM received %d correctly "
+			    "from %d fragments\n",
+			    psf->total_message, psf->packets_left);
 		    
 		  }
+		  else
+		    fprintf(stderr, "**** ERROR at EOM: "
+			    "length %d, rx sum = %li, "
+			    "server says it sent %li\n",
+			    psf->total_message, psf->sum, sum);
 		  
-		  
-		     
-		    // Devo inviare almeno un blocco + lo sfrido
-		    psf->state = CONTINUE;
-		    psf->BloccoCorrente=1;		  
-		  }
-		  
+		   //		  psf->state = FRAGSTATE_START_MESSAGE;
+		  terminate =1;
+	
+		  break;
+		}
+		break;
+		
+	case LWS_CALLBACK_SERVER_WRITEABLE:
+	  
+		switch (psf->state) {
 
+		case FRAGSTATE_START_MESSAGE:
+		
+			psf->packets_left= (StringL / BUFFER) + 1 ;
+			psf->leftover=(StringL % BUFFER );
+			fprintf(stderr, "Spamming %d random fragments\n",psf->packets_left);
+			psf->total_message = StringL;
+			
+			//psf->total_message = 0;
+			write_mode = LWS_WRITE_TEXT;
+			psf->state = FRAGSTATE_RANDOM_PAYLOAD;
+			psf->sum=0; 
+			printf ("write_mode in START =%i\n",write_mode);
+			/* fallthru */
 
-     		  
-		  
-		  if (psf-BloccoCorrente<psf->NBlocchi) { // siamo in blocco intermedio
-		    psf->state=CONTINUE;
-		    psf->BloccoCorrente++;
-		  } else { // ultimo blocco
-		    psf->state=FINAL;
-		    
-		  }
-		  write_mode=WS_WRITE_CONTINUATION | LWS_WRITE_NO_FIN;
+		case FRAGSTATE_RANDOM_PAYLOAD:
 
-
-
-
-
-
-
-			if (psf->packets_left)
+		  strncpy((char *)bp,json+psf->sum,BUFFER);			
+		
+			psf->packets_left--;
+			if (psf->packets_left) {
 				write_mode |= LWS_WRITE_NO_FIN;
-			else
-			  psf->state = FRAGSTATE_POST_PAYLOAD_SUM;
-			printf("PACKETS LEFT= %i - CHUNKS= %i - \n",psf->packets_left,chunk);
-			n = libwebsocket_write(wsi, bp, chunk, write_mode);
+				tosent=BUFFER;
+			} else {
+				psf->state = FRAGSTATE_POST_PAYLOAD_SUM;
+				tosent=psf->leftover;
+			}
+
+			n = libwebsocket_write(wsi, bp, tosent, write_mode);
+			psf->sum += n;
+			
 			if (n < 0)
 				return -1;
-			if (n < chunk) {
+			if (n < tosent) {
 				lwsl_err("Partial write\n");
 				return -1;
 			}
-
+			printf ("write_mode in RANDOM =%i\n",write_mode);
 			libwebsocket_callback_on_writable(context, wsi);
 			break;
 
 		case FRAGSTATE_POST_PAYLOAD_SUM:
-
+			printf ("write_mode in END =%i\n",write_mode);
 			fprintf(stderr, "Spamming session over, "
 					"len = %d. sum = 0x%lX\n",
 						  psf->total_message, psf->sum);
-
+			/*il numero psf-sum lo mando come 4 bytes*/
 			bp[0] = psf->sum >> 24;
 			bp[1] = psf->sum >> 16;
 			bp[2] = psf->sum >> 8;
 			bp[3] = psf->sum;
 
-			n = libwebsocket_write(wsi, (unsigned char *)bp,
-							   4, LWS_WRITE_BINARY);
+			/*n = libwebsocket_write(wsi, (unsigned char *)bp, 4, LWS_WRITE_BINARY);
 			if (n < 0)
 				return -1;
 			if (n < 4) {
 				lwsl_err("Partial write\n");
 				return -1;
-			}
-
-			psf->state = FRAGSTATE_START_MESSAGE;
-
-			libwebsocket_callback_on_writable(context, wsi);
+				}*/
 			break;
 		}
 		break;
-
-	case LWS_CALLBACK_CLOSED:
-
-		terminate = 1;
-		break;
-
 	/* because we are protocols[0] ... */
 
 	case LWS_CALLBACK_CLIENT_CONFIRM_EXTENSION_SUPPORTED:
 		if (strcmp(in, "deflate-stream") == 0) {
-			fprintf(stderr, "denied deflate-stream extension\n");
-			return 1;
+		  fprintf(stderr, "denied deflate-stream extension\n");
+		  return 1;
 		}
 		break;
 
@@ -253,7 +281,6 @@ static struct option options[] = {
 	{ "help",	no_argument,		NULL, 'h' },
 	{ "debug",	required_argument,	NULL, 'd' },
 	{ "port",	required_argument,	NULL, 'p' },
-	{ "ssl",	no_argument,		NULL, 's' },
 	{ "interface",  required_argument,	NULL, 'i' },
 	{ "client",	no_argument,		NULL, 'c' },
 	{ NULL, 0, 0, 0 }
@@ -263,7 +290,8 @@ int main(int argc, char **argv)
 {
 	int n = 0;
 	int port = 7681;
-	int use_ssl = 0;
+
+	
 	struct libwebsocket_context *context;
 	int opts = 0;
 	char interface_name[128] = "";
@@ -273,6 +301,9 @@ int main(int argc, char **argv)
 	int server_port = port;
 	struct lws_context_creation_info info;
 
+	json=readconfig("/home/reario/wsc/gh.json");
+	StringL=strlen(json);
+	
 	memset(&info, 0, sizeof info);
 
 	fprintf(stderr, "libwebsockets test fraggle\n"
@@ -286,9 +317,6 @@ int main(int argc, char **argv)
 		switch (n) {
 		case 'd':
 			lws_set_log_level(atoi(optarg), NULL);
-			break;
-		case 's':
-			use_ssl = 1;
 			break;
 		case 'p':
 			port = atoi(optarg);
@@ -305,7 +333,6 @@ int main(int argc, char **argv)
 			break;
 		case 'h':
 			fprintf(stderr, "Usage: libwebsockets-test-fraggle "
-					"[--port=<p>] [--ssl] "
 					"[-d <log bitfield>] "
 					"[--client]\n");
 			exit(1);
@@ -323,13 +350,6 @@ int main(int argc, char **argv)
 	info.port = server_port;
 	info.iface = iface;
 	info.protocols = protocols;
-#ifndef LWS_NO_EXTENSIONS
-	info.extensions = libwebsocket_get_internal_extensions();
-#endif
-	if (use_ssl) {
-		info.ssl_cert_filepath = LOCAL_RESOURCE_PATH"/libwebsockets-test-server.pem";
-		info.ssl_private_key_filepath = LOCAL_RESOURCE_PATH"/libwebsockets-test-server.key.pem";
-	}
 	info.gid = -1;
 	info.uid = -1;
 	info.options = opts;
@@ -344,25 +364,20 @@ int main(int argc, char **argv)
 		address = argv[optind];
 		fprintf(stderr, "Connecting to %s:%u\n", address, port);
 		wsi = libwebsocket_client_connect(context, address,
-						   port, use_ssl, "/", address,
+						   port, 0, "/", address,
 				 "origin", protocols[PROTOCOL_FRAGGLE].name,
 								  -1);
 		if (wsi == NULL) {
 			fprintf(stderr, "Client connect to server failed\n");
-			goto bail;
+
 		}
+			
 	}
 
 	n = 0;
-	int tot=4000;
-	printf("blocchi:%i - sfridi:%i - totali:%i\n",(tot/2000) + 1, tot % 2000, (tot/2000)*2000 + (tot % 2000));
 	while (!n && !terminate)
 		n = libwebsocket_service(context, 50);
-
 	fprintf(stderr, "Terminating...\n");
-
-bail:
 	libwebsocket_context_destroy(context);
-
 	return 0;
 }

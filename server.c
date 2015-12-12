@@ -1,5 +1,5 @@
 #include <errno.h>
-#include <libwebsockets.h>
+
 #include <math.h>
 
 #include "json.h"
@@ -11,7 +11,6 @@ static JsonNode *SoBs=NULL; /* la parte JSON per Spie o Bobine */
 static JsonNode *Energia=NULL;
 static JsonNode *E=NULL; // generico elemento
 
-static char *gh;
 static char *gh_current; /*stringa generata dinamicamente che contiene i valori aggiornati da inviare al client */
 
 //#define CHECK
@@ -20,6 +19,10 @@ static char *gh_current; /*stringa generata dinamicamente che contiene i valori 
 /* current token*/
 char * tok;
 #endif
+
+
+
+
 
 /*==============================READ JSON FILE===========================================================*/
 char * readconfig(char *file) {
@@ -151,8 +154,9 @@ static int callback_energy(struct libwebsocket_context * this,
 	return 0;
 }
 
+#ifdef OLD
 /*****>  spie_bobine*/
-static int callback_spie_bobine(
+static int callback_spie_bobine_old(
   struct libwebsocket_context * this,
   struct libwebsocket *wsi,
   enum libwebsocket_callback_reasons reason,
@@ -160,12 +164,13 @@ static int callback_spie_bobine(
   void *in,
   size_t len)
 {
-  /* questa callback invia al client (browser) la lista delle spie e delle bobine in bodo che il browser crei la maschera relativa 
+  /* 
+     questa callback invia al client (browser) la lista delle spie e delle bobine in bodo che il browser crei la maschera relativa 
      la variabile è contenuta dentro la stringa JSON "spie_bobine"
    */
 	int n,m;
 
-	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+4500+LWS_SEND_BUFFER_POST_PADDING];
+	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+8000+LWS_SEND_BUFFER_POST_PADDING];
 	unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 
 	switch (reason) {
@@ -198,6 +203,7 @@ static int callback_spie_bobine(
 
 	return 0;
 }
+#endif
 
 #ifdef CHECK
 static int callback_totp(struct libwebsocket_context * this,
@@ -296,7 +302,7 @@ static struct libwebsocket_protocols protocols[] = {
 				0                  // we don't use any per session data
 		}, { "spie_bobine", // protocol name - very important!
 				callback_spie_bobine,   // callback
-				0                  // we don't use any per session data
+		     sizeof(struct per_session_data_fraggle)
 },
 #ifdef CHECK
 		 { "totp", // protocol name - very important!
@@ -368,6 +374,7 @@ int main(void) {
   /* JSON STUFF */
   /*****************************************************/
   gh=readconfig("gh.json");
+  StringL=strlen(gh);
 
   printf("%s\n",gh);  
   node=json_decode(gh);

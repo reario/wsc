@@ -1,17 +1,15 @@
-#include <errno.h>
-
 #include <math.h>
-
-#include "json.h"
 #include "server.h"
 
 /* Gli input si riferiscono alla posizione del bit nella variabile inlong del programma */
-static JsonNode *node=NULL /* contiene TUTTO il JSON */;
-static JsonNode *SoBs=NULL; /* la parte JSON per Spie o Bobine */
-static JsonNode *Energia=NULL;
-static JsonNode *E=NULL; // generico elemento
+extern JsonNode *node /* contiene TUTTO il JSON */;
+extern JsonNode *SoBs; /* la parte JSON per Spie o Bobine */
+extern JsonNode *Energia;
+extern JsonNode *E; // generico elemento
 
-static char *gh_current; /*stringa generata dinamicamente che contiene i valori aggiornati da inviare al client */
+extern char *gh;
+extern char *gh_current;
+extern int StringL;
 
 //#define CHECK
 #ifdef CHECK
@@ -60,150 +58,11 @@ static int callback_http(struct libwebsocket_context * this,
 	return 0;
 }
 
+/*****> SPIE_BOBINE */
+// si trova sul file spie_bobine.c
+
 /*****> ENERGY */
-static int callback_energy(struct libwebsocket_context * this,
-		struct libwebsocket *wsi,
-		enum libwebsocket_callback_reasons reason,
-		void *user,
-		void *in,
-		size_t len)
-
-{
-	int n,m;
-	modbus_t *mbw;
-	JsonNode *Elem,*S;
-
-	// char PLC_IP[] = "192.168.1.157";
-	//	char OTB_IP[] = "192.168.1.11";
-
-	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+4096+LWS_SEND_BUFFER_POST_PADDING];
-	unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
-	// le tre libwebsocket_callback_on_writable sostituiscono quelle nel main che erano presenti in precedenza
-	switch (reason) {
-
-	case LWS_CALLBACK_ESTABLISHED: // just log message that someone is connecting
-	  fprintf(stderr,"**** connection established for protocol*energy*\n");
-	  libwebsocket_callback_on_writable(this,wsi);// comincia tutto il processo richiedendo la disponibilità a scrivere sul socket
-	  break;
-	  
-	case LWS_CALLBACK_RECEIVE:// il browser ha fatto una websocket.send e il valore è nella variabile *in*
-	  S=json_find_member(node,"SoBs");
-	  Elem=json_find_member(S,(char *)in);
-	  char *ip,*type;
-	  double bobina,reg;
-	  
-	  if (Elem) {
-	    ip=json_find_member(Elem,"ip")->string_;
-	    type=json_find_member(Elem,"type")->string_;
-	    
-	    
-	    if (json_find_member(Elem,"rele")->tag==JSON_NUMBER) {
-	      reg=-1;
-	      bobina=json_find_member(Elem,"rele")->number_;
-	    } else { /* è un array: il primo valore è il registro, il secondo il bit del registro da accender/spegnere */
-	      reg=json_find_member(Elem,"rele")->children.head->number_;
-	      bobina=json_find_member(Elem,"rele")->children.tail->number_;
-	      
-	    }
-
-	    /* viene chiamata quando si clicca su una bobina*/
-	    mbw = modbus_new_tcp(ip, 502);
-	    if (modbus_connect(mbw) == -1) {
-	      fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
-	      modbus_free(mbw);
-	      return -1;
-	    }
-	    //pulsante(mbw,(int)json_find_member(Elem,"rele")->number_);
-	    printf("registro=%lf - bobina=%lf\n",reg,bobina);
-	    attiva(mbw,type,reg,bobina);
-	    modbus_close(mbw);
-	    modbus_free(mbw);
-	    libwebsocket_callback_on_writable(this,wsi); // richiedi la disponibilità a scrivere  
-	  }
-	  else {
-	    printf("Ricevuto un comando non riconosciuto");
-	  }
-	  
-
-	  
-	  break;
-	  
-	case LWS_CALLBACK_SERVER_WRITEABLE: 
-
-
-	  // faccio la write per aggiornare lo stato delle spie appena il socket è disponibile. In questo modo implemeto il push dei dati
-	  n=sprintf((char *)p,gh_current);
-	  m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
-	  if (m < n) {
-	    lwsl_err("ERROR %d writing to di socket (returned %d)\n", n,m);
-	    return -1;
-	  }
-	  //printf("%s\n",p);
-	  usleep((useconds_t)50000); // 50 ms di pausa altrimenti il browser non gli sta dietro e si rallenta
-	  libwebsocket_callback_on_writable(this,wsi);// richiedi di nuovo la disponibilità a scrivere
-	  break;
-	  
-	case LWS_CALLBACK_CLOSED:
-	  fprintf(stderr,"connection *CLOSED* for energy\n");
-	  break;
-	  
-	default:
-	  break;
-	}
-	
-	return 0;
-}
-
-#ifdef OLD
-/*****>  spie_bobine*/
-static int callback_spie_bobine_old(
-  struct libwebsocket_context * this,
-  struct libwebsocket *wsi,
-  enum libwebsocket_callback_reasons reason,
-  void *user,
-  void *in,
-  size_t len)
-{
-  /* 
-     questa callback invia al client (browser) la lista delle spie e delle bobine in bodo che il browser crei la maschera relativa 
-     la variabile è contenuta dentro la stringa JSON "spie_bobine"
-   */
-	int n,m;
-
-	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+8000+LWS_SEND_BUFFER_POST_PADDING];
-	unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
-
-	switch (reason) {
-	  // faccio solo una chiamata a server_writeable perchè invio solo una volta i valori
-	case LWS_CALLBACK_ESTABLISHED:// just log message that someone is connecting
-	  fprintf(stderr,"**** connection established for protocol *spie_bobine*\n");
-	  libwebsocket_callback_on_writable(this,wsi);// chiede la disponibilità a scrivere sul socket
-	  break;
-	  
-	case LWS_CALLBACK_SERVER_WRITEABLE:// se c'è un socket aperto e questo è disponibile, invio la lista delle spie e bobine
-	  
-	  n = sprintf((char *)p,gh_current); /* invio il json letto dal file statico per dire al client la conformazione di tutto */	  
-	  
-	  m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
-	  fprintf(stderr,"constants spie and bobine sent\n");
-	  	  if (m < n) {
-	    // buffer troppo grande da mandare intero. Viene restituito un errore di questo tipo:
-	    // [1448056884:7846] ERR: ERROR 4471 writing to di socket spie_bobine (returned 4376)
-	    lwsl_err("ERROR %d writing to socket spie_bobine (returned %d)\n", n,m);
-	    return -1;
-	    }
-	  break;
-	  
-	case LWS_CALLBACK_CLOSED:
-	  fprintf(stderr,"connection *CLOSED* for spie_bobine\n");
-	  break;
-	default:
-	  break;
-	}
-
-	return 0;
-}
-#endif
+// si trova sul file energy.c
 
 #ifdef CHECK
 static int callback_totp(struct libwebsocket_context * this,
@@ -294,24 +153,25 @@ enum protocols {
 
 static struct libwebsocket_protocols protocols[] = {
 /* first protocol must always be HTTP handler */
-{ "http-only",   // name
-		callback_http, // callback
-		0              // per_session_data_size
-		}, { "energy", // protocol name - very important!
-				callback_energy,   // callback
-				0                  // we don't use any per session data
-		}, { "spie_bobine", // protocol name - very important!
-				callback_spie_bobine,   // callback
-		     sizeof(struct per_session_data_fraggle)
-},
+  { "http-only",   // name
+    callback_http, // callback
+    0              // per_session_data_size
+  }, { "energy", // protocol name - very important!
+       callback_energy,   // callback
+       sizeof(struct per_session_data_fraggle)
+  }, { "spie_bobine", // protocol name - very important!
+       callback_spie_bobine,   // callback
+       sizeof(struct per_session_data_fraggle)
+  },
+  
 #ifdef CHECK
-		 { "totp", // protocol name - very important!
-				callback_totp,   // callback
-				0                  // we don't use any per session data
-		},
+  { "totp", // protocol name - very important!
+    callback_totp,   // callback
+    0                  // we don't use any per session data
+  },
 #endif
-		{ NULL, NULL, 0 /* End of list */
-		} };
+  { NULL, NULL, 0 /* End of list */
+  } };
 /*==========================================================================*/
 
 
@@ -367,45 +227,38 @@ int main(void) {
   printf("starting server...\n");
   version();
 
-
-  // 
-  
   /*****************************************************/
   /* JSON STUFF */
   /*****************************************************/
+  
+  
   gh=readconfig("gh.json");
   StringL=strlen(gh);
 
   printf("%s\n",gh);  
   node=json_decode(gh);
 
-  //free(gh);
   if (node == NULL) {
     printf("Failed to decode \n");
     exit(EXIT_FAILURE);
-
   }
   SoBs=json_find_member(node,"SoBs");
   Energia=json_find_member(node,"Energia");
 
-  /*
-	json_foreach(En,Energia) 
+  /*	json_foreach(En,Energia) 
 	{     
 		printf("%lf - %lf\n",
 		       json_find_member(En,"V")->number_,
 		       json_find_member(En,"I")->number_);
 	}
-  
-  *****************************************************/
-  
-  
+  *****************************************************/ 
 
-  /*
+
   if (lws_daemonize("/tmp/.lwsts-lock")) {
     fprintf(stderr, "Failed to daemonize\n");
     return 1;
   }
-  */
+  
 
 // infinite loop, to end this server send SIGTERM. (CTRL+C)
 

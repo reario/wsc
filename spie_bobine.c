@@ -1,30 +1,19 @@
 #include "server.h"
 
-#define BUFFER 1024
-
-
-
-
-
 /* la stringa JSON delle configurazioni 
-
-
 int n = libwebsocket_write(wsi, &write_buffer[LWS_SEND_BUFFER_PRE_PADDING], write_len,(libwebsocket_write_protocol)write_mode);
 int write_mode;
 write_mode = LWS_WRITE_BINARY; // single frame, no fragmentation
 write_mode = LWS_WRITE_BINARY | LWS_WRITE_NO_FIN; // first fragment
 write_mode = LWS_WRITE_CONTINUATION | LWS_WRITE_NO_FIN; // all middle fragments
 write_mode = LWS_WRITE_CONTINUATION; // last fragment
-
-
-
 */
-//char *gh;
 
 
+char *gh;
+int StringL;
 
-int
-callback_spie_bobine(struct libwebsocket_context *context,
+int callback_spie_bobine(struct libwebsocket_context *context,
 			struct libwebsocket *wsi,
 			enum libwebsocket_callback_reasons reason,
 			void *user, 
@@ -33,11 +22,12 @@ callback_spie_bobine(struct libwebsocket_context *context,
 {
 	int n=0;
 	int tosent;
-	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 8000 +  LWS_SEND_BUFFER_POST_PADDING];
+
 	struct per_session_data_fraggle *psf = user;
 	int write_mode = LWS_WRITE_CONTINUATION;
 	// unsigned long sum;
 	// unsigned char *p = (unsigned char *)in;
+	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 16000 +  LWS_SEND_BUFFER_POST_PADDING];
 	unsigned char *bp = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	
 	switch (reason) {
@@ -100,6 +90,7 @@ callback_spie_bobine(struct libwebsocket_context *context,
 	    bp[1] = psf->sum >> 16;
 	    bp[2] = psf->sum >> 8;
 	    bp[3] = psf->sum; 
+
 	    break; 
 	  }
 	  

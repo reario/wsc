@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <libwebsockets.h>
+#include <errno.h>
+#include "json.h"
+
+#define BUFFER 1024
 
 static volatile float V, I, P, Bar, Bar_pozzo;
 static volatile uint16_t in1; /*prima parte dei 16 input, quelli da 0 a 15 : registro 65 sul plc master*/
@@ -13,7 +17,6 @@ static volatile uint16_t otb_din; /* ingressi digitali dell'OTB */
 static volatile uint16_t plc_dout; /*  OUT digitali del PLC */
 static volatile uint16_t otb_dout; /*  OUT digitali dell'OTB */
 static volatile uint64_t inlong=0; /* contiene fino a 64 ingressi digitali concatenazione di in1 in2, in3 e otb_din */
-
 
 enum fraggle_states {
 	START,
@@ -26,13 +29,8 @@ struct per_session_data_fraggle {
   int total_message;
   int leftover;
   unsigned long sum;
-  
-  char *pl;
   enum fraggle_states state;
 };
-
-char *gh;
-int StringL;
 
 /* bitwise operations */
 void printbitssimple64(uint64_t n);
@@ -47,7 +45,12 @@ int callback_spie_bobine(struct libwebsocket_context *context,struct libwebsocke
 		     void *user, 
 		     void *in, 
 		     size_t len);
-
+int callback_energy(struct libwebsocket_context * this,
+		struct libwebsocket *wsi,
+		enum libwebsocket_callback_reasons reason,
+		void *user,
+		void *in,
+		    size_t len);
 
 
 

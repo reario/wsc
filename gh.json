@@ -6,12 +6,13 @@
     "BAR": 0,
     "BAR_POZZO": 0
   },
-  "SoBs": {
+  "SoBs": { 
     "AUTOCLAVE": {
       "id": "Autoclave",
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
+      "input": 0,
       "funzione": "spia",
       "stato": 0
     },
@@ -20,6 +21,7 @@
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
+      "input": 1,
       "funzione": "spia",
       "stato": 0
     },
@@ -28,6 +30,7 @@
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
+      "input": 2,
       "funzione": "spia",
       "stato": 0
     },
@@ -36,6 +39,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 2,
+      "input": 3,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -44,6 +48,7 @@
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
+      "input": 4,
       "funzione": "spia",
       "stato": 0
     },
@@ -52,6 +57,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 6,
+      "input": 5,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -60,6 +66,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 6,
+      "input": 6,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -68,14 +75,16 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 5,
+      "input": 7,
       "funzione": "spia_bobina",
       "stato": 0
     },
     "LUCI_TAVERNA_2_di_2": {
-      "id": "Taverna",
+      "id": "Taverna 2",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 5,
+      "input": 8,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -84,6 +93,7 @@
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
+      "input": 9,
       "funzione": "spia",
       "stato": 0
     },
@@ -92,6 +102,7 @@
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
+      "input": 10,
       "funzione": "spia",
       "stato": 0
     },
@@ -100,6 +111,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 3,
+      "input": 11,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -108,6 +120,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 4,
+      "input": 12,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -116,6 +129,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 7,
+      "input": 13,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -124,6 +138,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 8,
+      "input": 14,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -132,6 +147,7 @@
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
+      "input": 15,
       "funzione": "spia",
       "stato": 0
     },
@@ -140,6 +156,25 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 10,
+      "input": 16,
+      "funzione": "spia_bobina",
+      "stato": 0
+    },
+    "FARETTI_ESTERNI": {
+      "id": "Faretti esterni",
+      "ip": "192.168.1.11",
+      "type": "I",
+      "rele": [100, 0],
+      "input": 50,
+      "funzione": "spia_bobina",
+      "stato": 0
+    },
+    "FARETTI_ESTERNI_SOTTO": {
+      "id": "Faretti esterni sotto",
+      "ip": "192.168.1.11",
+      "type": "I",
+      "rele": [100, 1],
+      "input": 49,
       "funzione": "spia_bobina",
       "stato": 0
     },
@@ -148,6 +183,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 12,
+      "input": -1,
       "funzione": "bobina",
       "stato": -1
     },
@@ -156,6 +192,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 96,
+      "input": -1,
       "funzione": "bobina",
       "stato": -1
     },
@@ -164,6 +201,7 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 97,
+      "input": -1,
       "funzione": "bobina",
       "stato": -1
     },
@@ -172,24 +210,18 @@
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 60,
+      "input": -1,
       "funzione": "bobina",
-      "stato": 0
+      "stato": -1
     },
     "CICALINO_POZZO": {
       "id": "Cicalino pozzo",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 61,
+      "input": -1,
       "funzione": "bobina",
-      "stato": 0
-    },
-    "FARETTI_ESTERNI": {
-      "id": "Faretti esterni",
-      "ip": "192.168.1.11",
-      "type": "P",
-      "rele": 11,
-      "funzione": "spia_bobina",
-      "stato": 0
+      "stato": -1
     }
   }
 }

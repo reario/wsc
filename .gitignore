@@ -1,8 +1,7 @@
 # Object files
 *.o
 
-libwebsockets-1.4-chrome43-firefox-36/*
-ccan/*
+tests/*
 
 # Libraries
 *.lib

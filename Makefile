@@ -2,13 +2,11 @@
 
 CC = gcc 
 
-objs = json.o attiva.o server.o bit.o
-
 INCDIR = /home/reario/include
 LIBDIR = /home/reario/lib
 
 
-all : server
+all : server server-nosync
 
 server :  json.o  bit.o attiva.o server.o spie_bobine.o energy.o
 	$(CC) -Wall -I${INCDIR} -I${INCDIR}/modbus -I${INCDIR}/liboath -L${LIBDIR} -lmodbus -lwebsockets -loath $^ -o $@

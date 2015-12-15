@@ -28,6 +28,8 @@ struct per_session_data_fraggle {
   int packets_left;
   int total_message;
   int leftover;
+  char *gh_values;
+  int gh_values_len;
   unsigned long sum;
   enum fraggle_states state;
 };

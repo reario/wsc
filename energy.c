@@ -1,7 +1,8 @@
 #include "server.h"
 
-
 char *gh_current;
+int gh_current_len;
+
 JsonNode *node=NULL /* contiene TUTTO il JSON */;
 JsonNode *SoBs=NULL; /* la parte JSON per Spie o Bobine */
 JsonNode *Energia=NULL;
@@ -13,25 +14,27 @@ JsonNode *E=NULL; // generico elemento
 */
 
 int callback_energy(struct libwebsocket_context * this,
-		struct libwebsocket *wsi,
-		enum libwebsocket_callback_reasons reason,
-		void *user,
-		void *in,
-		size_t len)
+		    struct libwebsocket *wsi,
+		    enum libwebsocket_callback_reasons reason,
+		    void *user,
+		    void *in,
+		    size_t len)
 
 {
   int n=0;
   modbus_t *mbw;
   JsonNode *Elem,*S;
-  int gh_current_len;
+  //int gh_current_len;
   int tosent;
   struct per_session_data_fraggle *pse = user; //per session energy
   int write_mode=LWS_WRITE_CONTINUATION;
   // char PLC_IP[] = "192.168.1.157";
-  //	char OTB_IP[] = "192.168.1.11";
+  //char OTB_IP[] = "192.168.1.11";
   
   unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING+16000+LWS_SEND_BUFFER_POST_PADDING];
   unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
+  
+  
   
   switch (reason) {
     
@@ -50,7 +53,7 @@ int callback_energy(struct libwebsocket_context * this,
 	bobina=json_find_member(Elem,"rele")->number_;
       } else {/* è un array: il primo valore è il registro,il secondo il bit del registro da acc/spe */
 	reg=json_find_member(Elem,"rele")->children.head->number_;
-	bobina=json_find_member(Elem,"rele")->children.tail->number_;	      
+	bobina=json_find_member(Elem,"rele")->children.tail->number_;      
       }
       /* viene chiamata quando si clicca su una bobina */
       mbw = modbus_new_tcp(ip, 502);
@@ -83,20 +86,31 @@ int callback_energy(struct libwebsocket_context * this,
     
     switch (pse->state) {
     case START:
-      gh_current_len=strlen(gh_current); /* vien calcolato di volta in volta perchè contiene i valori correnti */
-      pse->packets_left= (gh_current_len / BUFFER) + 1 ; // numero intero di frammenti kunghi BUFFER
-      pse->leftover=(gh_current_len % BUFFER ); // sfrido 
-      fprintf(stderr, "To be sent %d  fragments\n",pse->packets_left);	          
+
+      /**********************************************************
+	Attenzione dovrebbero essere atomiche. 
+	Mentre inizializzopse-gh_values, la stringa source gh_current potrebbe cambiare.
+	Questo è tanto più probabile quanti più più client sono collegati
+      ***********************************************************/
+      pse->gh_values_len=gh_current_len;
+      pse->gh_values=malloc(pse->gh_values_len*sizeof(unsigned char));
+      strncpy(pse->gh_values,gh_current,pse->gh_values_len);
+
+      /**********************************************************/
+
+      pse->packets_left= (pse->gh_values_len / BUFFER) + 1 ; // numero intero di frammenti kunghi BUFFER
+      pse->leftover=(pse->gh_values_len % BUFFER ); // sfrido 
+      //fprintf(stderr, "To be sent %d  fragments\n",pse->packets_left);          
       write_mode = LWS_WRITE_TEXT;
       pse->state = IN_BETWEEN;
       pse->sum=0; 
-      printf("------\n");
+      printf("|");
       /* fallthru */
       
     case IN_BETWEEN:   
       // faccio la write per aggiornare lo stato delle spie appena il socket è disponibile. 
       // In questo modo implemeto il push dei dati
-      strncpy((char *)p,gh_current+pse->sum,BUFFER);
+      strncpy((char *)p,pse->gh_values+pse->sum,BUFFER);
       pse->packets_left--;
       if (pse->packets_left) {
 	write_mode |= LWS_WRITE_NO_FIN;
@@ -106,9 +120,9 @@ int callback_energy(struct libwebsocket_context * this,
 	tosent=pse->leftover;
       }
       n = libwebsocket_write(wsi, p, tosent, write_mode);
+      printf(".");
       pse->sum += n;
       
-      //m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
       if (n < 0) {
 	return -1;
       }
@@ -122,18 +136,19 @@ int callback_energy(struct libwebsocket_context * this,
     case END:
       //
       usleep((useconds_t)50000); // 50 ms di pausa altrimenti il browser non gli sta dietro e si rallenta
+
+      free(pse->gh_values);
+
       pse->state=START;
+      printf("|\n");
       libwebsocket_callback_on_writable(this,wsi);// richiedi di nuovo la disponibilità a scrivere
       break;
-    }
-    
+    } 
   case LWS_CALLBACK_CLOSED:
-    fprintf(stderr,"connection *CLOSED* for energy\n");
-    break;
-    
+    //fprintf(stderr,"connection *CLOSED* for energy\n");
+    break;   
   default:
     break;
   }
-  
   return 0;
 }

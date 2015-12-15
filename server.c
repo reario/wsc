@@ -8,8 +8,12 @@ extern JsonNode *Energia;
 extern JsonNode *E; // generico elemento
 
 extern char *gh;
-extern char *gh_current;
 extern int StringL;
+
+
+extern char *gh_current;
+extern int gh_current_len;
+extern int semaforo;
 
 //#define CHECK
 #ifdef CHECK
@@ -17,10 +21,6 @@ extern int StringL;
 /* current token*/
 char * tok;
 #endif
-
-
-
-
 
 /*==============================READ JSON FILE===========================================================*/
 char * readconfig(char *file) {
@@ -253,12 +253,12 @@ int main(void) {
 	}
   *****************************************************/ 
 
-
+#ifdef DAEMON
   if (lws_daemonize("/tmp/.lwsts-lock")) {
     fprintf(stderr, "Failed to daemonize\n");
     return 1;
   }
-  
+#endif
 
 // infinite loop, to end this server send SIGTERM. (CTRL+C)
 
@@ -266,17 +266,11 @@ int main(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     
-    /*
-     * This provokes the LWS_CALLBACK_SERVER_WRITEABLE for every
-     * live websocket connection using the ENERGY protocol,
-     * as soon as it can take more packets (usually immediately)
-    */
     ms = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
     if ((ms - oldms) > 50) {
       /* Read 12 registers from the address 65 */
       
       if (modbus_read_registers(mb, 65, 16, tab_reg) > 0) {
-	
 	
 	/*------------------- PLC IN--------------------------------------*/		  
 	in1=tab_reg[0]; /* 65 */
@@ -292,8 +286,7 @@ int main(void) {
 	inlong=place64(inlong,in2,16);     // 16-22
 	inlong=place64(inlong,in3,23);     // 23-38
 	inlong=place64(inlong,otb_din,39); // 39-50
-	/* adesso in inlong ho lo stato di tutti gli input nelle posizioni sopra indicate */
-	
+	/* adesso in inlong ho lo stato di tutti gli input nelle posizioni sopra indicate */	
 	// VALORI ANALOGICI (PM9 + OTB)
 	I=(float)(tab_reg[4]+(tab_reg[3]<<16))/1000; // PM9        
 	V=(float)(tab_reg[6]+(tab_reg[5]<<16))/1000; // PM9        
@@ -303,27 +296,29 @@ int main(void) {
 	//printf("-----------------\n");
 	uint16_t input;
 
-	json_foreach(E,SoBs) {
-	  if (E) {
-	    input=json_find_member(E,"input")->number_;
-	    if (input>=0 && input!=1000) { /* 
-					      è una spia e/o una bobina. 1000 è un upperbound arbitrario,
-					      che rappresenta il num massimo che può assumere un input
-					   */
-	      //number_ è un duble e non posso assegnargli quello che ritorna read_single_state64
-	      json_find_member(E,"stato")->number_=read_single_state64(inlong,input)==1?1:0;
+	  json_foreach(E,SoBs) {
+	    if (E) {
+	      input=json_find_member(E,"input")->number_;
+	      if (input>=0 && input!=1000) { 
+		/* 
+		   è una spia e/o una bobina. 1000 è un upperbound arbitrario,
+		   che rappresenta il num massimo che può assumere un input
+		*/
+		//number_ è un duble e non posso assegnargli quello che ritorna read_single_state64
+		json_find_member(E,"stato")->number_=read_single_state64(inlong,input)==1?1:0;
+	      }
+	      
 	    }
-	    
-	  }
-	}  
-	json_find_member(Energia,"V")->number_=V;
+	  }  
+	  json_find_member(Energia,"V")->number_=V;
 	json_find_member(Energia,"I")->number_=I;
 	json_find_member(Energia,"P")->number_=P;
 	json_find_member(Energia,"BAR")->number_=Bar;
 	json_find_member(Energia,"BAR_POZZO")->number_=Bar_pozzo;
 	gh_current = json_stringify(node,NULL);
+	gh_current_len=strlen(gh_current);/* vien calcolato di volta in volta perchè contiene i valori correnti */
 	json_delete(E);
-	
+
       } else {
 	printf("ERR: modbus read registers riprovo a creare il context\n");
 	modbus_close(mb);

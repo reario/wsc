@@ -89,13 +89,12 @@ int callback_energy(struct libwebsocket_context * this,
 
       /**********************************************************
 	Attenzione dovrebbero essere atomiche. 
-	Mentre inizializzopse-gh_values, la stringa source gh_current potrebbe cambiare.
+	Mentre inizializzo pse->gh_values, la stringa source gh_current potrebbe cambiare.
 	Questo è tanto più probabile quanti più più client sono collegati
       ***********************************************************/
       pse->gh_values_len=gh_current_len;
       pse->gh_values=malloc(pse->gh_values_len*sizeof(unsigned char));
       strncpy(pse->gh_values,gh_current,pse->gh_values_len);
-
       /**********************************************************/
 
       pse->packets_left= (pse->gh_values_len / BUFFER) + 1 ; // numero intero di frammenti kunghi BUFFER
@@ -134,7 +133,6 @@ int callback_energy(struct libwebsocket_context * this,
       break;
       
     case END:
-      //
       usleep((useconds_t)50000); // 50 ms di pausa altrimenti il browser non gli sta dietro e si rallenta
 
       free(pse->gh_values);

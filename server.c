@@ -1,5 +1,11 @@
 #include <math.h>
+
+#ifdef DAEMON
+#include <signal.h>
+#endif
+
 #include "server.h"
+
 
 /* Gli input si riferiscono alla posizione del bit nella variabile inlong del programma */
 extern JsonNode *node /* contiene TUTTO il JSON */;
@@ -23,9 +29,22 @@ char * tok;
 #endif
 
 /*==============================READ JSON FILE===========================================================*/
+
+#ifdef DAEMON
+void signal_handler(int signal)
+{
+  FILE *fh = fopen("/tmp/sig", "w");
+/* Display a message indicating we have received a signal */
+ if (signal == SIGUSR2) fprintf(fh,"Received a SIGUSR2 signal\n");
+ fclose(fh);
+ /* Exit the application */
+ exit(0);
+}
+#endif
+
 char * readconfig(char *file) {
 
-  char *buffer=NULL;
+char *buffer=NULL;
   FILE *fh = fopen(file, "rb");
   if ( fh != NULL )
     {
@@ -154,8 +173,8 @@ enum protocols {
 static struct libwebsocket_protocols protocols[] = {
 /* first protocol must always be HTTP handler */
   { "http-only",   // name
-    callback_http, // callback
-    0              // per_session_data_size
+      callback_http, // callback
+      0              // per_session_data_size
   }, { "energy", // protocol name - very important!
        callback_energy,   // callback
        sizeof(struct per_session_data_fraggle)
@@ -222,7 +241,7 @@ int main(void) {
     fprintf(stderr, "libwebsocket init failed\n");
     return -1;
   }
-  
+  signal(SIGUSR2, signal_handler);  
   
   printf("starting server...\n");
   version();
@@ -258,6 +277,7 @@ int main(void) {
     fprintf(stderr, "Failed to daemonize\n");
     return 1;
   }
+
 #endif
 
 // infinite loop, to end this server send SIGTERM. (CTRL+C)

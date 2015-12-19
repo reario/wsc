@@ -8,20 +8,14 @@
 
 
 /* Gli input si riferiscono alla posizione del bit nella variabile inlong del programma */
-extern JsonNode *node /* contiene TUTTO il JSON */;
-extern JsonNode *SoBs; /* la parte JSON per Spie o Bobine */
-extern JsonNode *Energia;
-extern JsonNode *E; // generico elemento
+JsonNode *node = NULL/* contiene TUTTO il JSON */;
+JsonNode *SoBs = NULL; /* la parte JSON per Spie o Bobine */
+JsonNode *Energia = NULL;
+JsonNode *E; // generico elemento
 
-extern char *gh;
-extern int StringL;
+char *gh;
 
 
-extern char *gh_current;
-extern int gh_current_len;
-extern int semaforo;
-
-//#define CHECK
 #ifdef CHECK
 #include <oath.h>
 /* current token*/
@@ -241,8 +235,10 @@ int main(void) {
     fprintf(stderr, "libwebsocket init failed\n");
     return -1;
   }
+#ifdef DAEMON
   signal(SIGUSR2, signal_handler);  
-  
+#endif
+
   printf("starting server...\n");
   version();
 
@@ -252,7 +248,6 @@ int main(void) {
   
   
   gh=readconfig("gh.json");
-  StringL=strlen(gh);
 
   printf("%s\n",gh);  
   node=json_decode(gh);
@@ -261,31 +256,32 @@ int main(void) {
     printf("Failed to decode \n");
     exit(EXIT_FAILURE);
   }
+
   SoBs=json_find_member(node,"SoBs");
   Energia=json_find_member(node,"Energia");
 
-  /*	json_foreach(En,Energia) 
+  /*	
+	json_foreach(En,Energia) 
 	{     
-		printf("%lf - %lf\n",
-		       json_find_member(En,"V")->number_,
-		       json_find_member(En,"I")->number_);
+	printf("%lf - %lf\n",
+	json_find_member(En,"V")->number_,
+	json_find_member(En,"I")->number_);
 	}
-  *****************************************************/ 
+  **/ 
 
 #ifdef DAEMON
   if (lws_daemonize("/tmp/.lwsts-lock")) {
     fprintf(stderr, "Failed to daemonize\n");
     return 1;
   }
-
 #endif
 
 // infinite loop, to end this server send SIGTERM. (CTRL+C)
+  uint16_t input;
+  struct timeval tv;
 
   while (n >= 0) {
-    struct timeval tv;
     gettimeofday(&tv, NULL);
-    
     ms = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
     if ((ms - oldms) > 50) {
       /* Read 12 registers from the address 65 */
@@ -313,32 +309,27 @@ int main(void) {
 	P=(float)(tab_reg[8]+(tab_reg[7]<<16))/100;  // PM9        
 	Bar=(float)(tab_reg[10]*0.002442); // INPUT ANALOGICO OTB
 	Bar_pozzo=(float)(tab_reg[11]*0.002442); // INPUT ANALOGICO OTB
-	//printf("-----------------\n");
-	uint16_t input;
 
-	  json_foreach(E,SoBs) {
-	    if (E) {
-	      input=json_find_member(E,"input")->number_;
-	      if (input>=0 && input!=1000) { 
-		/* 
-		   è una spia e/o una bobina. 1000 è un upperbound arbitrario,
-		   che rappresenta il num massimo che può assumere un input
-		*/
-		//number_ è un duble e non posso assegnargli quello che ritorna read_single_state64
-		json_find_member(E,"stato")->number_=read_single_state64(inlong,input)==1?1:0;
-	      }
-	      
-	    }
-	  }  
-	  json_find_member(Energia,"V")->number_=V;
+	json_foreach(E,SoBs) {
+	  if (E) {
+	    input=json_find_member(E,"input")->number_;
+	    if (input>=0 && input!=1000) { 
+	      /* è una spia e/o una bobina. 1000 è un upperbound arbitrario,
+		 che rappresenta il num massimo che può assumere un input */
+	      //number_ è un duble e non posso assegnargli quello che ritorna read_single_state64
+	      json_find_member(E,"stato")->number_=read_single_state64(inlong,input)==1?1:0;
+	    }	      
+	  }
+	}  
+	json_find_member(Energia,"V")->number_=V;
 	json_find_member(Energia,"I")->number_=I;
 	json_find_member(Energia,"P")->number_=P;
 	json_find_member(Energia,"BAR")->number_=Bar;
 	json_find_member(Energia,"BAR_POZZO")->number_=Bar_pozzo;
-	gh_current = json_stringify(node,NULL);
-	gh_current_len=strlen(gh_current);/* vien calcolato di volta in volta perchè contiene i valori correnti */
+	//	gh_current = json_stringify(node,NULL);
+	//gh_current_len=strlen(gh_current);/* vien calcolato di volta in volta perchè contiene i valori correnti */
 	json_delete(E);
-
+	
       } else {
 	printf("ERR: modbus read registers riprovo a creare il context\n");
 	modbus_close(mb);

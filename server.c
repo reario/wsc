@@ -334,7 +334,7 @@ int main(void) {
 	printf("ERR: modbus read registers riprovo a creare il context\n");
 	modbus_close(mb);
 	modbus_free(mb);
-	mb = modbus_new_tcp("127.0.0.1", 502);
+	mb = modbus_new_tcp("192.168.1.103", 502);
 	if (modbus_connect(mb) == -1) {
 	  fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
 	  modbus_free(mb);

@@ -14,7 +14,7 @@ JsonNode *Energia = NULL;
 JsonNode *E; // generico elemento
 
 char *gh;
-
+extern StringL;
 
 #ifdef CHECK
 #include <oath.h>
@@ -248,8 +248,9 @@ int main(void) {
   
   
   gh=readconfig("gh.json");
+  StringL=strlen(gh);
 
-  printf("%s\n",gh);  
+  //  printf("%s\n",gh);  
   node=json_decode(gh);
 
   if (node == NULL) {

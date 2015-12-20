@@ -8,7 +8,7 @@
   },
   "SoBs": { 
     "AUTOCLAVE": {
-      "id": "Autoclave",
+      "label": "Autoclave",
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
@@ -17,7 +17,7 @@
       "stato": 0
     },
     "POMPA_SOMMERSA": {
-      "id": "Pozzo",
+      "label": "Pozzo",
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
@@ -26,7 +26,7 @@
       "stato": 0
     },
     "RIEMPIMENTO": {
-      "id": "Serbatoio",
+      "label": "Serbatoio",
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
@@ -35,7 +35,7 @@
       "stato": 0
     },
     "LUCI_ESTERNE_SOTTO": {
-      "id": "Luci Esterne",
+      "label": "Luci Esterne",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 2,
@@ -44,7 +44,7 @@
       "stato": 0
     },
     "CENTR_R8": {
-      "id": "Centralino (R8)",
+      "label": "Centralino (R8)",
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
@@ -53,7 +53,8 @@
       "stato": 0
     },
     "LUCI_GARAGE_DA_4": {
-      "id": "Garage 4",
+      "label": "Garage 4",
+      "Group": "Garage",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 6,
@@ -62,7 +63,8 @@
       "stato": 0
     },
     "LUCI_GARAGE_DA_2": {
-      "id": "Garage 2",
+      "label": "Garage 2",
+      "Group": "Garage",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 6,
@@ -71,7 +73,8 @@
       "stato": 0
     },
     "LUCI_TAVERNA_1_di_2": {
-      "id": "Taverna 1",
+      "label": "Taverna 1",
+      "Group": "Taverna",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 5,
@@ -80,7 +83,8 @@
       "stato": 0
     },
     "LUCI_TAVERNA_2_di_2": {
-      "id": "Taverna 2",
+      "label": "Taverna 2",
+      "Group": "Taverna",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 5,
@@ -89,7 +93,7 @@
       "stato": 0
     },
     "INTERNET": {
-      "id": "Internet",
+      "label": "Internet",
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
@@ -98,7 +102,7 @@
       "stato": 0
     },
     "C9912": {
-      "id": "C9912",
+      "label": "C9912",
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
@@ -107,7 +111,7 @@
       "stato": 0
     },
     "LUCI_CUN_LUN": {
-      "id": "Cunicolo Lungo",
+      "label": "Cunicolo Lungo",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 3,
@@ -116,7 +120,7 @@
       "stato": 0
     },
     "LUCI_CUN_COR": {
-      "id": "Cunicolo Corto",
+      "label": "Cunicolo Corto",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 4,
@@ -125,7 +129,7 @@
       "stato": 0
     },
     "LUCI_STUDIO_SOTTO": {
-      "id": "Studio Sotto",
+      "label": "Studio Sotto",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 7,
@@ -134,7 +138,7 @@
       "stato": 0
     },
     "LUCI_ANDRONE_SCALE": {
-      "id": "Androne",
+      "label": "Androne",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 8,
@@ -143,7 +147,7 @@
       "stato": 0
     },
     "GENERALE_AUTOCLAVE": {
-      "id": "Generale Autoclave",
+      "label": "Generale Autoclave",
       "ip": "192.168.1.157",
       "type": "NA",
       "rele": -1,
@@ -152,7 +156,7 @@
       "stato": 0
     },
     "LUCI_CANTINETTA": {
-      "id": "Cantinetta",
+      "label": "Cantinetta",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 10,
@@ -161,7 +165,7 @@
       "stato": 0
     },
     "FARETTI_ESTERNI": {
-      "id": "Faretti esterni",
+      "label": "Faretti esterni",
       "ip": "192.168.1.11",
       "type": "I",
       "rele": [100, 0],
@@ -170,7 +174,7 @@
       "stato": 0
     },
     "FARETTI_ESTERNI_SOTTO": {
-      "id": "Faretti esterni sotto",
+      "label": "Faretti esterni sotto",
       "ip": "192.168.1.11",
       "type": "I",
       "rele": [100, 1],
@@ -179,7 +183,7 @@
       "stato": 0
     },
     "SERRATURA_PORTONE": {
-      "id": "Serratura Portone",
+      "label": "Serratura Portone",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 12,
@@ -188,7 +192,7 @@
       "stato": -1
     },
     "APERTURA_PARZIALE": {
-      "id": "Parziale",
+      "label": "Parziale",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 96,
@@ -197,7 +201,7 @@
       "stato": -1
     },
     "APERTURA_TOTALE": {
-      "id": "Totale",
+      "label": "Totale",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 97,
@@ -206,7 +210,7 @@
       "stato": -1
     },
     "CICALINO_AUTOCLAVE": {
-      "id": "Cicalino autoclave",
+      "label": "Cicalino autoclave",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 60,
@@ -215,7 +219,7 @@
       "stato": -1
     },
     "CICALINO_POZZO": {
-      "id": "Cicalino pozzo",
+      "label": "Cicalino pozzo",
       "ip": "192.168.1.157",
       "type": "P",
       "rele": 61,

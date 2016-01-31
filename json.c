@@ -69,12 +69,6 @@ static void sb_init(SB *sb)
 	} while (0)
 
 
-void version() {
-
-  printf("This is WebSocket Server JSON library 1.0\n");
-
-}
-
 static void sb_grow(SB *sb, int need)
 {
 	size_t length = sb->cur - sb->start;

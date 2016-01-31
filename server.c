@@ -195,7 +195,6 @@ int main(void) {
   
   modbus_t *mb;
   uint16_t tab_reg[17]; // max 15 reg. in realtà ne servono 16
-  // uint16_t x; // usata per loop dentro la variabile inlong di 64 bit  
   
   mb = modbus_new_tcp("192.168.1.103", 502);
   
@@ -205,7 +204,6 @@ int main(void) {
     return -1;
   }
   
-  // server url will be http://localhost:9999
   int port = 8081;
   int n = 0;
   unsigned int ms, oldms = 0;
@@ -240,10 +238,9 @@ int main(void) {
 #endif
 
   printf("starting server...\n");
-  version();
 
   /*****************************************************/
-  /* JSON STUFF */
+  /* JSON STUFF                                        */
   /*****************************************************/
   
   

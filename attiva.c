@@ -4,7 +4,7 @@
 uint16_t attiva(modbus_t *m, char *t, double registro, double bit) {
   // NOTA: le attivazioni non coinvolgono il PLC-PC da cui il programma acquisisce i dati
   // Tutte le operazioni modbus di read e write in questa funzione sono fatte usando 
-  // gli IP dei dispositivi remoti
+  // gli IP dei singoli dispositivi remoti (OTB e TWIDO)
 
   /*
     Questa funzione Attiva i relè dei dispositivi remoti identificati dentro il parametro (modbus *m).

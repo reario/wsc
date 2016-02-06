@@ -1,11 +1,11 @@
 #include "server.h"
 
-
 extern JsonNode *node; /* contiene TUTTO il JSON è definito in server.c */
 
 /*
    Questa è la callback che invia ripetutamente al client le info dei sensori e delle
    spie e/o bobine.
+   Questa funzione stava nel file server.c e poi spostata qui per pulizia del codice.
 */
 
 int callback_energy(struct libwebsocket_context * this,

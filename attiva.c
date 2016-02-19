@@ -109,7 +109,7 @@ uint16_t attiva(modbus_t *m, char *t, double registro, double bit) {
 
   //////////////// BOBINE CONTENUTE IN UN REGISTRO (per esempio OTB) ////////////
   ////////////////////////////////////////////////////////////////////////
-  // Si richiede di aggiornare una Bobina nel registro come Pulsante
+  // Si richiede di aggiornare un tipo Bobina contenuto nel registro come Pulsante
   if ( (registro>=0) && (strncmp(t,"P",(size_t)1)==0)) 
     {
       // leggo il registro
@@ -120,7 +120,7 @@ uint16_t attiva(modbus_t *m, char *t, double registro, double bit) {
 	  // Metto a ON
 	  //if ( (regs[0] & (1<<b)) == 0) // non è a zero
 	  regs[0]|=(1<<b); 
-	  // Lo riscrivo. Per compattezza controllo se è andato male
+	  // Lo riscrivo. Per sicurezza controllo se è andato male
 	  printf("3.1 Riscrivo il registro\n");
 	  if (modbus_write_register(m,r,regs[0])<0) 
 	    {

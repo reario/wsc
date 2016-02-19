@@ -107,7 +107,7 @@ uint16_t attiva(modbus_t *m, char *t, double registro, double bit) {
   //////////////////////////////////////////////////////////
 
 
-  //////////////// BOBINE CONTENUTE IN UN REGISTRO (P.E. OTB) ////////////
+  //////////////// BOBINE CONTENUTE IN UN REGISTRO (per esempio OTB) ////////////
   ////////////////////////////////////////////////////////////////////////
   // Si richiede di aggiornare una Bobina nel registro come Pulsante
   if ( (registro>=0) && (strncmp(t,"P",(size_t)1)==0)) 

@@ -51,7 +51,7 @@ int callback_spie_bobine(struct libwebsocket_context *context,
 	  switch (psf->state) {
 	  case START:
 	    	    
-	    psf->packets_left= (StringL / BUFFER) + 1 ; // numero intero di frammenti kunghi BUFFER
+	    psf->packets_left= (StringL / BUFFER) + 1 ; // numero intero di frammenti lunghi BUFFER
 	    psf->leftover=(StringL % BUFFER ); // sfrido
 	    fprintf(stderr, "To be sent %d  fragments\n",psf->packets_left);	          
 	    write_mode = LWS_WRITE_TEXT;

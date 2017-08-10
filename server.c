@@ -77,7 +77,7 @@ static int callback_http(struct libwebsocket_context * this,
 /*****> ENERGY */
 // si trova sul file energy.c
 
-#ifdef CHECK
+#ifdef CHECK /* one time password */
 static int callback_totp(struct libwebsocket_context * this,
 		struct libwebsocket *wsi,
 		enum libwebsocket_callback_reasons reason,
@@ -115,7 +115,7 @@ static int callback_totp(struct libwebsocket_context * this,
 		time_t now, t0, time_step_size;
 		int valid;
 		seclen = (size_t)(strlen(sec)+1);
-		time_step_size=OATH_TOTP_DEFAULT_TIME_STEP_SIZE;
+		time_step_size=120;OATH_TOTP_DEFAULT_TIME_STEP_SIZE;
 		t0=OATH_TOTP_DEFAULT_START_TIME;
 		now=time(NULL);
 		valid=oath_totp_validate (sec, //const char *secret,
@@ -307,7 +307,8 @@ int main(void) {
 	P=(float)(tab_reg[8]+(tab_reg[7]<<16))/100;  // PM9        
 	Bar=(float)(tab_reg[10]*0.002442); // INPUT ANALOGICO OTB
 	Bar_pozzo=(float)(tab_reg[11]*0.002442); // INPUT ANALOGICO OTB
-
+	
+	//	printf("V=%f\n",V);
 	json_foreach(E,SoBs) {
 	  if (E) {
 	    input=json_find_member(E,"input")->number_;
